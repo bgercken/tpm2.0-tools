@@ -57,123 +57,104 @@
     ((pcrSelection).pcrSelect[( (pcr)/8 )] & ( 1 << ( (pcr) % 8) ))
 
 int debugLevel = 0;
-FILE *fp = NULL;
 char outFilePath[PATH_MAX];
-const struct {
-    TPMI_ALG_HASH alg;
-    const char *desc;
-} g_algs [] =
+
+int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 {
-    {TPM_ALG_SHA1, "TPM_ALG_SHA1"},
-    {TPM_ALG_SHA256, "TPM_ALG_SHA256"},
-    {TPM_ALG_SHA384, "TPM_ALG_SHA384"},
-    {TPM_ALG_SHA512, "TPM_ALG_SHA512"},
-    {TPM_ALG_SM3_256, "TPM_ALG_SM3_256"},
-    {TPM_ALG_NULL, "TPM_ALG_UNKOWN"}
-};
+	TPMS_AUTH_COMMAND sessionData;
+	TSS2_SYS_CMD_AUTHS sessionsData;
+	UINT16 i, digestSize;
+	TPML_PCT_SELECTION pcrSelection;
+	TPML_DIGEST pcrValues;
+	TPML_DIGEST_VALUES digests;
+	TPML_PCR_SELECTION pcrSelectionOut;
 
-static struct {
-    int count;
-    TPMI_ALG_HASH alg[8];
-} g_banks = {3, {TPM_ALG_SHA1, TPM_ALG_SHA256, TPM_ALG_SHA384,}};
+	TPMS_AUTH_COMMAND *sessionDataArray[1];
 
-TPML_PCR_SELECTION g_pcrSelections;
+	sessionDataArray[0] = &sessionData;
+	sessionsData.cmdAuths = &sessionDataArray[0];
 
-static struct {
-    int count;
-    TPML_DIGEST pcrValues[24];
-} g_pcrs = {0,};
+	sessionData.sessionHandle = TPM_RS_PW;
 
-int findAlgorithm(TPMI_ALG_HASH algId)
-{
-    int i;
-    for(i = 0; g_algs[i].alg != TPM_ALG_NULL; i++)
-        if( g_algs[i].alg == algId )
-            break;
+	sessionData.nonce.t.size = 0;
+	sessionData.hmac.t.size = 0;
+	
+	*( (UINT8 *)((void *)&sessionData.sessionAttributes ) ) = 0;
+	
+	digests.count = 1;
+	digests.digests[0].hashAlg = hashAlgIn;
+	digestSize = GetDigestSize( digests.digests[0].hashAlg );
 
-    return i;
+	switch (hashAlgIn) {
+
+		case TPM_ALG_SHA1:
+			memcpy(digests.digests[0].digest.sha1, byteHash, SHA1_DIGEST_SIZE);
+			break;
+		case TPM_ALG_SHA256:
+			memcpy(digests.digests[0].digest.sha256, byteHash, SHA256_DIGEST_SIZE);
+			break;
+		case TPM_ALG_SHA384:
+			memcpy(digests.digests[0].digest.sha384, byteHash, SHA384_DIGEST_SIZE);
+			break;
+		case TPM_ALG_SHA512:
+			memcpy(digests.digests[0].digest.sha512, byteHash, SHA512_DIGEST_SIZE);
+			break;
+		case TPM_ALG_SM3_256:
+			memcpy(digests.digests[0].digest.sha1, byteHash, SM3_256_DIGEST_SIZE);
+			break;
+		default:
+			printf("Invalid algorithm.  Exiting");
+			return -1;
+	}	
+
+	pcrSelection.count = 1;
+	pcrSelection.pcrSelections[0].hash = hashAlgIn;
+	pcrSelection.pcrSelections[0].sizeofSelect = 3;
+
+	CLEAR_PCR_SELECT_BITS(pcrSelection);	
+
+	SET_PCR_SELECT_BIT(pcrSelection.pcrSelections[0], pcr); 
+
+	sessionsData.cmdAuthsCount = 1;
+	sessionsData.cmdAuths[0] = &sessionData;
+	
+	rval = Tss2_Sys_PCR_Extend( sysContext, pcr, &sessionsData, &digests, 0 );
+	if( rval != TPM_RC_SUCCESS) {
+		ErrorHandler(rval);
+		printf("Failed to extend PCR: %d\n", pcr);
+		Cleanup();
+		return -2;
+	}
+	return 0;
 }
 
-void updatePcrSelections(TPML_PCR_SELECTION *s1, TPML_PCR_SELECTION *s2)
+int verifyHash(char *strhash)
 {
-    for(int i2 = 0; i2 < s2->count; i2++)
-    {
-        for(int i1 = 0; i1 < s1->count; i1++)
-        {
-            if(s2->pcrSelections[i2].hash != s1->pcrSelections[i1].hash)
-                continue;
-
-            for(int j = 0; j < s1->pcrSelections[i1].sizeofSelect; j++)
-                s1->pcrSelections[i1].pcrSelect[j] &=
-                    ~s2->pcrSelections[i2].pcrSelect[j];
-        }
-    }
+	for(int i = 0; i < SHA512_DIGEST_SIZE*2; i++)
+	{
+		//We're done, input hash is smaller than SHA512_DIGEST_SIZE, bail.
+		if(strhash[i] == '\0')
+			break;
+			
+		if(!isxdigit(strhash[i]))
+			return -1;
+	}
+	return 0;
 }
-
-bool emptyPcrSections(TPML_PCR_SELECTION *s)
-{
-    for(int i = 0; i < s->count; i++)
-        for(int j = 0; j < s->pcrSelections[i].sizeofSelect; j++)
-            if(s->pcrSelections[i].pcrSelect[j])
-                return false;
-
-    return true;
-}
-
-int readPcrValues()
-{
-    TPML_PCR_SELECTION pcrSelectionIn;
-    TPML_PCR_SELECTION pcrSelectionOut;
-    UINT32 pcrUpdateCounter;
-    UINT32 rval;
-
-    //1. prepare pcrSelectionIn with g_pcrSelections
-    memcpy(&pcrSelectionIn, &g_pcrSelections, sizeof(pcrSelectionIn));
-
-    //2. call pcr_read
-    g_pcrs.count = 0;
-    do
-    {
-        rval = Tss2_Sys_PCR_Read( sysContext, 0, &pcrSelectionIn,
-                                  &pcrUpdateCounter, &pcrSelectionOut,
-                                  &g_pcrs.pcrValues[g_pcrs.count], 0 );
-
-        if(rval != TPM_RC_SUCCESS )
-        {
-            printf("read pcr failed. tpm error 0x%0x\n\n", rval);
-            return -1;
-        }
-
-    //3. unmask pcrSelectionOut bits from pcrSelectionIn
-        updatePcrSelections(&pcrSelectionIn, &pcrSelectionOut);
-
-    //4. goto step 2 if pcrSelctionIn still has bits set
-    } while(++g_pcrs.count < 24 && !emptyPcrSections(&pcrSelectionIn));
-
-    if(g_pcrs.count >= 24 && !emptyPcrSections(&pcrSelectionIn))
-    {
-        printf("too much pcrs to get! try to split into multiple calls...\n\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-int showPcrValues()
-{
-    return 0;
-}
-
 
 void showHelp(const char *name)
 {
     printf("\n%s  [options]\n"
             "-h, --help                Display command tool usage info;\n"
             "-v, --version             Display command tool version info;\n"
-            "-s, --hash <hexHash>      The hashed data to extend the pcr with\n"
+            "-s, --hash <hexHash>      The input hashed digest to extend the pcr with\n"
             "-c, --pcr <pcrId>     	   The id of the PCR to extend\n"
-            "-g, --algorithim <hexAlg>     The algorithm id, optional\n"
-            "-o, --output  <filename>      The file to hold the PCR values in binary format, optional\n"
+            "-g, --algorithim <hexAlg>     The algorithm id to use when extending pcr, examples:\n"
+			"							       TPM_ALG_SHA1\n"
+			"							       TPM_ALG_SHA256\n"
+			"							       TPM_ALG_SHA384\n"
+			"							       TPM_ALG_SHA512\n"
+			"							       TPM_ALG_SM3_256\n"
             "-p, --port    <port number>   The Port number, default is %d, optional\n"
             "-d, --debugLevel <0|1|2|3>    The level of debug message, default is 0, optional\n"
                 "\t0 (high level test results)\n"
@@ -202,9 +183,17 @@ const char *findChar(const char *str, int len, char c)
     return NULL;
 }
 
+/* 
+   TODO:
+   At the moment, only accepts digests as input values. Should implement
+   functionality to accept files/streams of data, compute the digest of that
+   data, and then extend the pcr.
+ */
 int main(int argc, char *argv[])
 {
-	char hash[SHA512_DIGEST_SIZE*2];
+	BYTE byteHash[SHA512_DIGEST_SIZE];
+	UINT16 byteLength;
+	char strHash[SHA512_DIGEST_SIZE*2] = 0;			//SHA512_DIGEST_SIZE*2 is the largest digest we'd encounter
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 	UINT32 pcr = -1;
@@ -216,22 +205,20 @@ int main(int argc, char *argv[])
     const char *optstring = "hvg:p:d:o:L:s";
     static struct option long_options[] = {
         {"help",0,NULL,'h'},
-        {"version",0,NULL,'v'},
+		{"version",0,NULL,'v'},
+        {"algorithm",0,NULL,'g'},
         {"hash",0,NULL,'s'},
-        {"output",1,NULL,'o'},
         {"port",1,NULL,'p'},
         {"debugLevel",1,NULL,'d'},
         {0,0,0,0}
     };
 
-    TPMI_ALG_HASH algorithmId;
+    TPMI_ALG_HASH algorithmId = 0;
 
     int returnVal = 0;
     int flagCnt = 0;
     int h_flag = 0,
         v_flag = 0,
-        o_flag = 0,
-        L_flag = 0,
         s_flag = 0,
         g_flag = 0;
 
@@ -244,15 +231,6 @@ int main(int argc, char *argv[])
             break;
         case 'v':
             v_flag = 1;
-            break;
-        case 'o':
-            safeStrNCpy(outFilePath, optarg, sizeof(outFilePath));
-            if(checkOutFile(outFilePath) != 0)
-            {
-                returnVal = -2;
-                break;
-            }
-            o_flag = 1;
             break;
         case 'p':
             if( getPort(optarg, &port) )
@@ -269,29 +247,41 @@ int main(int argc, char *argv[])
             }
             break;
 		case 's':
-			//Read string representation of sha hash
-			//Verify validity of hash (hex digits only)
-			//hash comes in as string ie sha512sum = 3b12a25123af..., digest size is only 64 but string has 128 bits
-			//encode string to byte representation, so 2 chars = 1 byte of digest.
-			safeStrNCpy(hash, optarg, sizeof(hash));
-			if ( verifyHash(hash) );
+			safeStrNCpy(strhash, optarg, sizeof(strhash));
+			if ( verifyHash(strhash) );
 			{
-				printf("Failed to read provided hash data.\n");
+				printf("Input digest is not in valid hexadecimal format.\n");
 				returnVal = -5;
+				break;
 			}
+			if ( hex2ByteStructure(strhash, &byteLength, &byteHash) != 0)
+			{
+				printf("Failed to convert string representation of hash to byte array");
+				returnVal = -6;
+				break;
+			} 
 			break;
 		case 'c':
 			if ( getPcrId(optarg, &pcr) )
 			{
 				printf("Invalid pcr value.\n");
-				returnVal = -6;
+				returnVal = -7;
 			}
 			break;
+        case 'g':
+            if(getSizeUint16Hex(optarg,&algorithmId) != 0)
+            {
+                showArgError(optarg, argv[0]);
+                returnVal = -1;
+                break;
+            }
+            g_flag = 1;
+            break;
         case ':':
-            returnVal = -7;
+            returnVal = -8;
             break;
         case '?':
-            returnVal = -8;
+            returnVal = -9;
             break;
         }
         if(returnVal)
@@ -300,7 +290,7 @@ int main(int argc, char *argv[])
 
     if(returnVal != 0)
         return returnVal;
-    flagCnt = h_flag + v_flag + g_flag + L_flag + s_flag;
+    flagCnt = h_flag + v_flag + g_flag + s_flag;
 
     if(flagCnt > 1)
     {
@@ -319,34 +309,15 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    if(o_flag)
-    {
-        fp = fopen(outFilePath,"w+");
-        if(NULL == fp)
-        {
-            printf("OutFile: %s Can Not Be Created !\n",outFilePath);
-            return -8;
-        }
-    }
-
     prepareTest(hostName, port, debugLevel);
 
     if(returnVal == 0)
     {
-        if(s_flag)
-            showBanks();
-        else if(g_flag)
-            returnVal = showAlgPcrValues(algorithmId);
-        else if(L_flag)
-            returnVal = showSelectedPcrValues();
-        else
-            returnVal = showAllPcrValues();
+		doPcrExtendOp(byteHash, pcr, algorithmId);
     }
 
     finishTest();
 
-    if(fp)
-        fclose(fp);
     if(returnVal)
         return -9;
 
