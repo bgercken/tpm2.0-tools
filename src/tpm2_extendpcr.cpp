@@ -41,6 +41,7 @@
 #include <sapi/tpm20.h>
 #include <tcti/tcti_socket.h>
 #include "common.h"
+#include "sample.h"
 
 #define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \
     (pcrSelection).pcrSelect[( (pcr)/8 )] |= ( 1 << ( (pcr) % 8) );
@@ -64,10 +65,11 @@ int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 	TPMS_AUTH_COMMAND sessionData;
 	TSS2_SYS_CMD_AUTHS sessionsData;
 	UINT16 i, digestSize;
-	TPML_PCT_SELECTION pcrSelection;
+	TPML_PCR_SELECTION pcrSelection;
 	TPML_DIGEST pcrValues;
 	TPML_DIGEST_VALUES digests;
 	TPML_PCR_SELECTION pcrSelectionOut;
+	TSS2_RC rval;
 
 	TPMS_AUTH_COMMAND *sessionDataArray[1];
 
@@ -111,7 +113,7 @@ int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 	pcrSelection.pcrSelections[0].hash = hashAlgIn;
 	pcrSelection.pcrSelections[0].sizeofSelect = 3;
 
-	CLEAR_PCR_SELECT_BITS(pcrSelection);	
+	CLEAR_PCR_SELECT_BITS(pcrSelection.pcrSelections[0]);	
 
 	SET_PCR_SELECT_BIT(pcrSelection.pcrSelections[0], pcr); 
 
@@ -122,7 +124,6 @@ int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 	if( rval != TPM_RC_SUCCESS) {
 		ErrorHandler(rval);
 		printf("Failed to extend PCR: %d\n", pcr);
-		Cleanup();
 		return -2;
 	}
 	return 0;
@@ -166,7 +167,7 @@ void showHelp(const char *name)
             "    %s -h\n"
             "display version:\n"
             "    %s -v\n"
-            , name, DEFAULT_RESMGR_TPM_PORT, );
+            , name, DEFAULT_RESMGR_TPM_PORT );
 }
 
 const char *findChar(const char *str, int len, char c)
@@ -193,7 +194,7 @@ int main(int argc, char *argv[])
 {
 	BYTE byteHash[SHA512_DIGEST_SIZE];
 	UINT16 byteLength;
-	char strHash[SHA512_DIGEST_SIZE*2] = 0;			//SHA512_DIGEST_SIZE*2 is the largest digest we'd encounter
+	char strHash[SHA512_DIGEST_SIZE*2] = {0};			//SHA512_DIGEST_SIZE*2 is the largest digest we'd encounter
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 	UINT32 pcr = -1;
@@ -247,14 +248,14 @@ int main(int argc, char *argv[])
             }
             break;
 		case 's':
-			safeStrNCpy(strhash, optarg, sizeof(strhash));
-			if ( verifyHash(strhash) );
+			safeStrNCpy(strHash, optarg, sizeof(strHash));
+			if ( verifyHash(strHash) );
 			{
 				printf("Input digest is not in valid hexadecimal format.\n");
 				returnVal = -5;
 				break;
 			}
-			if ( hex2ByteStructure(strhash, &byteLength, &byteHash) != 0)
+			if ( hex2ByteStructure(strHash, &byteLength, byteHash) != 0)
 			{
 				printf("Failed to convert string representation of hash to byte array");
 				returnVal = -6;
