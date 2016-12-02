@@ -322,6 +322,8 @@ void OpenOutFile( FILE **outFp );
 
 void CloseOutFile( FILE **outFp );
 
+UINT16 GetDigestSize( TPM_ALG_ID authHash );
+
 #ifdef __cplusplus
 }
 #endif
