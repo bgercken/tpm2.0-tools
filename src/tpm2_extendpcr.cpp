@@ -133,11 +133,7 @@ int verifyHash(char *strhash)
 {
 	for(int i = 0; i < SHA512_DIGEST_SIZE*2; i++)
 	{
-		//We're done, input hash is smaller than SHA512_DIGEST_SIZE, bail.
-		if(strhash[i] == '\0')
-			break;
-			
-		if(!isxdigit(strhash[i]))
+		if(!isxdigit(strhash[i]) && strhash[i] != '\0')
 			return -1;
 	}
 	return 0;
@@ -198,17 +194,19 @@ int main(int argc, char *argv[])
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 	UINT32 pcr = -1;
+	int ret = 0;
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "hvg:p:d:o:L:s";
+    const char *optstring = "hvg:p:d:s:c:";
     static struct option long_options[] = {
         {"help",0,NULL,'h'},
 		{"version",0,NULL,'v'},
-        {"algorithm",0,NULL,'g'},
-        {"hash",0,NULL,'s'},
+        {"algorithm",1,NULL,'g'},
+        {"hash",1,NULL,'s'},
+        {"pcr",1,NULL,'c'},
         {"port",1,NULL,'p'},
         {"debugLevel",1,NULL,'d'},
         {0,0,0,0}
@@ -249,7 +247,8 @@ int main(int argc, char *argv[])
             break;
 		case 's':
 			safeStrNCpy(strHash, optarg, sizeof(strHash));
-			if ( verifyHash(strHash) );
+			ret = verifyHash(strHash);
+			if ( ret != 0 )
 			{
 				printf("Input digest is not in valid hexadecimal format.\n");
 				returnVal = -5;
