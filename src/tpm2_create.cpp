@@ -42,6 +42,9 @@
 #include <tcti/tcti_socket.h>
 #include "common.h"
 
+#define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \
+	(pcrSelection).pcrSelect[( (pcr)/8 )] |= ( 1 << ( (pcr) % 8) );
+
 TPMS_AUTH_COMMAND sessionData;
 bool hexPasswd = false;
 int debugLevel = 0;
@@ -126,7 +129,7 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, in
     return 0;
 }
 
-int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes)
+int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes, UINT32 pcr)
 {
     TPM_RC rval;
     TPMS_AUTH_RESPONSE sessionDataOut;
@@ -189,7 +192,22 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
         inPublic->t.publicArea.objectAttributes.val = objectAttributes;
     printf("ObjectAttribute: 0x%08X\n",inPublic->t.publicArea.objectAttributes.val);
 
-    creationPCR.count = 0;
+	if(pcr > 0)
+	{
+		creationPCR.count = 1;
+		creationPCR.pcrSelections[0].hash = TPM_ALG_SHA1; //use sha1 for now, till we figure out how this is supposed to work.
+		creationPCR.pcrSelections[0].sizeofSelect = 3;
+		
+		creationPCR.pcrSelections[0].pcrSelect[0] = 0;
+		creationPCR.pcrSelections[0].pcrSelect[1] = 0;
+		creationPCR.pcrSelections[0].pcrSelect[2] = 0;
+	
+		SET_PCR_SELECT_BIT( creationPCR.pcrSelections[0], pcr );		
+	} 
+	else
+	{
+		creationPCR.count = 0;
+	}
 
     rval = Tss2_Sys_Create(sysContext, parentHandle, &sessionsData, inSensitive, inPublic,
             &outsideInfo, &creationPCR, &outPrivate,&outPublic,&creationData, &creationHash,
@@ -242,6 +260,7 @@ void showHelp(const char *name)
         "-o, --opu <publicKeyFileName>  the output file which contains the public key, optional\n"
         "-O, --opr <privateKeyFileName> the output file which contains the private key, optional\n"
         "-X, --passwdInHex              passwords given by any options are hex format.\n"
+        "-r, --pcr                      the PCR to seal data to.\n"
 
         "-p, --port  <port number>  The Port number, default is %d, optional\n"
         "-d, --debugLevel <0|1|2|3> The level of debug message, default is 0, optional\n"
@@ -274,11 +293,13 @@ int main(int argc, char* argv[])
     char oprFilePath[PATH_MAX] = {0};
     char *contextParentFilePath = NULL;
 
+	UINT32 pcr = -1;
+
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "hvH:P:K:g:G:A:I:L:o:O:p:d:c:X";
+    const char *optstring = "hvH:P:K:g:G:A:I:L:o:O:p:d:c:r:X";
     static struct option long_options[] = {
       {"help",0,NULL,'h'},
       {"version",0,NULL,'v'},
@@ -294,6 +315,7 @@ int main(int argc, char* argv[])
       {"opr",1,NULL,'O'},
       {"contextParent",1,NULL,'c'},
       {"passwdInHex",0,NULL,'X'},
+      {"pcr",1,NULL,'r'},
       {"port",1,NULL,'p'},
       {"debugLevel",1,NULL,'d'},
       {0,0,0,0}
@@ -314,6 +336,7 @@ int main(int argc, char* argv[])
         L_flag = 0,
         o_flag = 0,
         c_flag = 0,
+        r_flag = 0,
         O_flag = 0/*,
         f_flag = 0*/;
     if(argc == 1)
@@ -436,6 +459,13 @@ int main(int argc, char* argv[])
             printf("contextParentFile = %s\n", contextParentFilePath);
             c_flag = 1;
             break;
+        case 'r':
+			if ( getPcrId(optarg, &pcr) )
+			{
+				printf("Invalid pcr value.\n");
+				returnVal = -17;
+			}
+			break;
         case 'X':
             hexPasswd = true;
             break;
@@ -502,7 +532,7 @@ int main(int argc, char* argv[])
         if(c_flag)
             returnVal = loadTpmContextFromFile(sysContext, &parentHandle, contextParentFilePath);
         if(returnVal == 0)
-            returnVal = create(parentHandle, &inPublic, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, A_flag, objectAttributes);
+            returnVal = create(parentHandle, &inPublic, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, A_flag, objectAttributes, pcr);
 
         finishTest();
 
