@@ -192,7 +192,7 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
         inPublic->t.publicArea.objectAttributes.val = objectAttributes;
     printf("ObjectAttribute: 0x%08X\n",inPublic->t.publicArea.objectAttributes.val);
 
-	if(pcr > 0)
+	/*if(pcr > 0)
 	{
 		creationPCR.count = 1;
 		creationPCR.pcrSelections[0].hash = TPM_ALG_SHA1; //use sha1 for now, till we figure out how this is supposed to work.
@@ -207,7 +207,9 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
 	else
 	{
 		creationPCR.count = 0;
-	}
+	}*/
+
+	creationPCR.count = 0;
 
     rval = Tss2_Sys_Create(sysContext, parentHandle, &sessionsData, inSensitive, inPublic,
             &outsideInfo, &creationPCR, &outPrivate,&outPublic,&creationData, &creationHash,

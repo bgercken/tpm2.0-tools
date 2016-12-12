@@ -73,7 +73,8 @@ sbin_PROGRAMS = src/tpm2_listpcrs \
 		  src/tpm2_verifysignature \
 		  src/tpm2_listpersistent \
 		  src/tpm2_rc_decode \
-		  src/tpm2_extendpcr
+		  src/tpm2_extendpcr \
+		  src/tpm2_buildpcrpolicy
 
 if UNIT
 check_PROGRAMS = \
@@ -135,6 +136,7 @@ src_tpm2_verifysignature_SOURCES = src/tpm2_verifysignature.cpp
 src_tpm2_listpersistent_SOURCES = src/tpm2_listpersistent.cpp
 src_tpm2_rc_decode_SOURCES = src/rc-decode.c src/tpm2_rc_decode.c
 src_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.cpp
+src_tpm2_buildpcrpolicy_SOURCES = src/tpm2_buildpcrpolicy.cpp
 
 if UNIT
 test_tpm2_rc_decode_unit_CFLAGS  = $(AM_CXXFLAGS) $(CMOCKA_CFLAGS)
