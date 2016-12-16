@@ -113,16 +113,25 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
     TPM_RC rval = TPM_RC_SUCCESS;
     TPM2B_DIGEST pcrDigest;
     TPML_DIGEST pcrValues;
+    TPML_PCR_SELECTION pcrs;
     UINT32 pcrUpdateCounter;
     TPML_PCR_SELECTION pcrSelectionOut;
 
     pcrDigest.t.size = 0;
 
+    pcrs.count = 1;
+    pcrs.pcrSelections[0].hash = TPM_ALG_SHA1;
+    pcrs.pcrSelections[0].sizeofSelect = 3;
+    pcrs.pcrSelections[0].pcrSelect[0] = 0;
+    pcrs.pcrSelections[0].pcrSelect[1] = 0;
+    pcrs.pcrSelections[0].pcrSelect[2] = 0;
+    SET_PCR_SELECT_BIT( pcrs.pcrSelections[0], 15 );
+
     //
     // Compute pcrDigest
     //
     // Read PCRs
-    rval = Tss2_Sys_PCR_Read( sysContext, 0, &g_pcrSelections, &pcrUpdateCounter, &pcrSelectionOut, &pcrValues, 0 );
+    rval = Tss2_Sys_PCR_Read( sysContext, 0, &pcrs, &pcrUpdateCounter, &pcrSelectionOut, &pcrValues, 0 );
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
@@ -132,7 +141,7 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
-    rval = Tss2_Sys_PolicyPCR( sysContext, policySession->sessionHandle, 0, &pcrDigest, &g_pcrSelections, 0 );
+    rval = Tss2_Sys_PolicyPCR( sysContext, policySession->sessionHandle, 0, &pcrDigest, &pcrs, 0 );
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
@@ -141,7 +150,7 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
 
 
 
-TPM_RC BuildPolicy()
+TPM_RC BuildPolicy(bool trial)
 {
     SESSION *policySession = 0;
     TPM2B_DIGEST policyDigest;
@@ -156,7 +165,7 @@ TPM_RC BuildPolicy()
     // Start policy session.
     symmetric.algorithm = TPM_ALG_NULL;
     rval = StartAuthSessionWithParams( &policySession, TPM_RH_NULL, 0, TPM_RH_NULL, 0, &nonceCaller, &encryptedSalt, 
-        TPM_SE_TRIAL, &symmetric, TPM_ALG_SHA256 );
+        trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, TPM_ALG_SHA1 );
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
@@ -172,51 +181,30 @@ TPM_RC BuildPolicy()
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
-    
-    // Need to flush the session here.
-    rval = Tss2_Sys_FlushContext( sysContext, policySession->sessionHandle );
-    if( rval != TPM_RC_SUCCESS )
-        return rval;
+   	if( trial )
+	{ 
+		// Need to flush the session here.
+		rval = Tss2_Sys_FlushContext( sysContext, policySession->sessionHandle );
+		if( rval != TPM_RC_SUCCESS )
+			return rval;
 
-    // And remove the session from sessions table.
-    rval = EndAuthSession( policySession );
-    if( rval != TPM_RC_SUCCESS )
-        return rval;
-    
+		// And remove the session from sessions table.
+		rval = EndAuthSession( policySession );
+		if( rval != TPM_RC_SUCCESS )
+			return rval;
+	} 
+
+	printf("policyDigest.size = %d", policyDigest.t.size); 
 
     // Write PCR Policy in the file.
     if(fp != NULL &&
-        fwrite(&(policyDigest.t.buffer[0]), policyDigest.t.size, 1, fp) != 1)
+        fwrite(policyDigest.t.buffer, sizeof(BYTE), policyDigest.t.size, fp) != policyDigest.t.size)
     {
         printf("write to file %s failed!\n", outFilePath);
         return -1;
     }
     return rval;
 }
-
-int getBanks()
-{
-    TPMI_YES_NO moreData;
-    TPMS_CAPABILITY_DATA capabilityData;
-    UINT32 rval;
-
-    rval = Tss2_Sys_GetCapability( sysContext, 0, TPM_CAP_PCRS, 0, 1,
-                                   &moreData, &capabilityData, 0 );
-    if(rval != TPM_RC_SUCCESS)
-    {
-        printf("\n......GetCapability: Get PCR allocation status Error. TPM Error:0x%x......\n", rval);
-        return -1;
-    }
-
-    for( int i=0; i < capabilityData.data.assignedPCR.count; i++ )
-    {
-        g_banks.alg[i] = capabilityData.data.assignedPCR.pcrSelections[i].hash;
-    }
-    g_banks.count = capabilityData.data.assignedPCR.count;
-
-    return 0;
-}
-
 
 void showHelp(const char *name)
 {
@@ -233,6 +221,7 @@ void showHelp(const char *name)
                 "\t1 (test app send/receive byte streams)\n"
                 "\t2 (resource manager send/receive byte streams)\n"
                 "\t3 (resource manager tables)\n"
+			"-t, --trial"
             "\n\tExample:\n"
             "display usage:\n"
             "    %s -h\n"
@@ -295,7 +284,9 @@ int parsePCRList(const char *str, int len, TPMS_PCR_SELECTION *pcrSel)
 
         if(getPcrId(buf, &pcr)!= 0)
             return -1;
-
+		
+		printf(" --- Pcr selected: %d", pcr);
+		
         pcrSel->pcrSelect[pcr/8] |= (1 << (pcr % 8));
     } while(str);
 
@@ -376,12 +367,12 @@ int main(int argc, char *argv[])
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "hvp:d:o:L:";
+    const char *optstring = "hvtp:d:o:";
     static struct option long_options[] = {
         {"help",0,NULL,'h'},
         {"version",0,NULL,'v'},
+        {"trial",0,NULL,'t'},
         {"output",1,NULL,'o'},
-        {"selList",1,NULL,'L'},
         {"port",1,NULL,'p'},
         {"debugLevel",1,NULL,'d'},
         {0,0,0,0}
@@ -393,8 +384,8 @@ int main(int argc, char *argv[])
     int flagCnt = 0;
     int h_flag = 0,
         v_flag = 0,
-        o_flag = 0,
-        L_flag = 0;      
+        t_flag = 0,
+        o_flag = 0;
 
     while((opt = getopt_long(argc,argv,optstring,long_options,NULL)) != -1)
     {
@@ -406,6 +397,9 @@ int main(int argc, char *argv[])
         case 'v':
             v_flag = 1;
             break;
+        case 't':
+            t_flag = 1;
+            break;
         case 'o':
             safeStrNCpy(outFilePath, optarg, sizeof(outFilePath));
             if(checkOutFile(outFilePath) != 0)
@@ -415,15 +409,6 @@ int main(int argc, char *argv[])
             }
             o_flag = 1;
             break;
-        case 'L':
-            if(parsePCRSelections(optarg, &g_pcrSelections) != 0)
-            {
-                showArgError(optarg, argv[0]);
-                returnVal = -10;
-                break;
-            }
-            L_flag = 1;
-            break;        
         case 'p':
             if( getPort(optarg, &port) )
             {
@@ -457,7 +442,7 @@ int main(int argc, char *argv[])
 
     if(returnVal != 0)
         return returnVal;
-    flagCnt = h_flag + v_flag + L_flag;
+    flagCnt = h_flag + v_flag;
 
     if(flagCnt > 1)
     {
@@ -486,7 +471,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if((o_flag != 1) || (L_flag != 1))
+    if((o_flag != 1))
     {
         showHelp(argv[0]);
         return -9;   
@@ -494,11 +479,7 @@ int main(int argc, char *argv[])
 
     prepareTest(hostName, port, debugLevel);
 
-    returnVal = getBanks();
-    if(returnVal == 0)
-    {
-        returnVal = BuildPolicy();        
-    }
+    returnVal = BuildPolicy(t_flag);        
 
     finishTest();
 

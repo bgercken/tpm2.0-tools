@@ -191,29 +191,24 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
     if(A_flag == 1)
         inPublic->t.publicArea.objectAttributes.val = objectAttributes;
     printf("ObjectAttribute: 0x%08X\n",inPublic->t.publicArea.objectAttributes.val);
-
-	/*if(pcr > 0)
-	{
-		creationPCR.count = 1;
-		creationPCR.pcrSelections[0].hash = TPM_ALG_SHA1; //use sha1 for now, till we figure out how this is supposed to work.
-		creationPCR.pcrSelections[0].sizeofSelect = 3;
-		
-		creationPCR.pcrSelections[0].pcrSelect[0] = 0;
-		creationPCR.pcrSelections[0].pcrSelect[1] = 0;
-		creationPCR.pcrSelections[0].pcrSelect[2] = 0;
-	
-		SET_PCR_SELECT_BIT( creationPCR.pcrSelections[0], pcr );		
-	} 
-	else
-	{
-		creationPCR.count = 0;
-	}*/
-
+	printf("ObjectAttrubutes.sign: %d\n", inPublic->t.publicArea.objectAttributes.sign);
+	printf("ObjectAttrubutes.decrypt: %d\n", inPublic->t.publicArea.objectAttributes.decrypt);
+	printf("ObjectAttrubutes.restructed: %d\n", inPublic->t.publicArea.objectAttributes.restricted);
+	printf("ObjectAttrubutes.encryptedDuplication: %d\n", inPublic->t.publicArea.objectAttributes.encryptedDuplication);
+	printf("ObjectAttrubutes.noDA: %d\n", inPublic->t.publicArea.objectAttributes.noDA);
+	printf("ObjectAttrubutes.adminWithPolicy: %d\n", inPublic->t.publicArea.objectAttributes.adminWithPolicy);
+	printf("ObjectAttrubutes.userWithAuth: %d\n", inPublic->t.publicArea.objectAttributes.userWithAuth);
+	printf("ObjectAttrubutes.sensitiveDataOrigin: %d\n", inPublic->t.publicArea.objectAttributes.sensitiveDataOrigin);
+	printf("ObjectAttrubutes.fixedParent: %d\n", inPublic->t.publicArea.objectAttributes.fixedParent);
+	printf("ObjectAttrubutes.fixedTPM: %d\n", inPublic->t.publicArea.objectAttributes.fixedTPM);
+	printf("inPublic.authPolicy.b.size = %d\n", inPublic->t.publicArea.authPolicy.b.size);
+	printf("inSensitive.t.sensitive.data.b.size = %d\n",inSensitive->t.sensitive.data.b.size);
 	creationPCR.count = 0;
 
     rval = Tss2_Sys_Create(sysContext, parentHandle, &sessionsData, inSensitive, inPublic,
             &outsideInfo, &creationPCR, &outPrivate,&outPublic,&creationData, &creationHash,
             &creationTicket, &sessionsDataOut);
+
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nCreate Object Failed ! ErrorCode: 0x%0x\n\n",rval);
@@ -262,7 +257,6 @@ void showHelp(const char *name)
         "-o, --opu <publicKeyFileName>  the output file which contains the public key, optional\n"
         "-O, --opr <privateKeyFileName> the output file which contains the private key, optional\n"
         "-X, --passwdInHex              passwords given by any options are hex format.\n"
-        "-r, --pcr                      the PCR to seal data to.\n"
 
         "-p, --port  <port number>  The Port number, default is %d, optional\n"
         "-d, --debugLevel <0|1|2|3> The level of debug message, default is 0, optional\n"
@@ -301,7 +295,7 @@ int main(int argc, char* argv[])
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "hvH:P:K:g:G:A:I:L:o:O:p:d:c:r:X";
+    const char *optstring = "hvH:P:K:g:G:A:I:L:o:O:p:d:c:X";
     static struct option long_options[] = {
       {"help",0,NULL,'h'},
       {"version",0,NULL,'v'},
@@ -317,7 +311,6 @@ int main(int argc, char* argv[])
       {"opr",1,NULL,'O'},
       {"contextParent",1,NULL,'c'},
       {"passwdInHex",0,NULL,'X'},
-      {"pcr",1,NULL,'r'},
       {"port",1,NULL,'p'},
       {"debugLevel",1,NULL,'d'},
       {0,0,0,0}
@@ -338,7 +331,6 @@ int main(int argc, char* argv[])
         L_flag = 0,
         o_flag = 0,
         c_flag = 0,
-        r_flag = 0,
         O_flag = 0/*,
         f_flag = 0*/;
     if(argc == 1)
@@ -432,6 +424,7 @@ int main(int argc, char* argv[])
                 break;
             }
             L_flag = 1;
+            printf("inPublic.t.publicArea.authPolicy.t.size = %d\n",inPublic.t.publicArea.authPolicy.t.size);
             break;
         case 'o':
             safeStrNCpy(opuFilePath, optarg, sizeof(opuFilePath));
