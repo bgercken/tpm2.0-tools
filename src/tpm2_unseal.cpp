@@ -57,7 +57,6 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
 
-
 	rval = BuildPolicyExternal(sysContext, &policySession, false);  //Build real policy, don't write to file
 	if(rval != TPM_RC_SUCCESS)
 	{
@@ -76,9 +75,10 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
     sessionsDataOut.rspAuthsCount = 1;
     sessionsData.cmdAuthsCount = 1;
 
-    sessionData.sessionHandle = TPM_RS_PW;
+    sessionData.sessionHandle = policySession->sessionHandle;
     sessionData.nonce.t.size = 0;
     *((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
+	sessionData.sessionAttributes.continueSession = 1;
     if(P_flag == 0)
         sessionData.hmac.t.size = 0;
     if (sessionData.hmac.t.size > 0 && hexPasswd)

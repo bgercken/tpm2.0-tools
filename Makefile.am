@@ -83,6 +83,7 @@ check_PROGRAMS = \
 endif
 
 COMMON_SRC = \
+    src/BuildPolicy.c \
     src/common.c \
     src/debug.c \
     src/syscontext.c \
