@@ -324,6 +324,11 @@ void CloseOutFile( FILE **outFp );
 
 UINT16 GetDigestSize( TPM_ALG_ID authHash );
 
+TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial);
+
+TPM_RC ConcatSizedByteBuffer( TPM2B_MAX_BUFFER *result, TPM2B *addBuffer );
+
+TPM_RC CompareSizedByteBuffer( TPM2B *buffer1, TPM2B *buffer2 );
 #ifdef __cplusplus
 }
 #endif

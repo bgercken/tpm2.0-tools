@@ -39,7 +39,7 @@
 #include <getopt.h>
 
 #include <sapi/tpm20.h>
-//#include "sample.h"
+#include "sample.h"
 #include <tcti/tcti_socket.h>
 #include "common.h"
 
@@ -50,11 +50,20 @@ bool hexPasswd = false;
 UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
 {
     UINT32 rval;
+	SESSION *policySession;
     TPMS_AUTH_RESPONSE sessionDataOut;
     TSS2_SYS_CMD_AUTHS sessionsData;
     TSS2_SYS_RSP_AUTHS sessionsDataOut;
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
+
+
+	rval = BuildPolicyExternal(sysContext, &policySession, false);  //Build real policy, don't write to file
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
+		return rval;
+	}
 
     TPM2B_SENSITIVE_DATA outData = {{sizeof(TPM2B_SENSITIVE_DATA)-2, }};
 
@@ -101,6 +110,21 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
         printf("Failed to save unsealed data into %s\n", outFileName);
         return -2;
     }
+
+	//Now clean up our session
+	rval = Tss2_Sys_FlushContext( sysContext, policySession->sessionHandle );	
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("FlushContext failed: Error Code: -x%x\n", rval);
+		return -3;
+	}
+
+	rval = EndAuthSession( policySession );
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("EndAuthSession failed: Error Code: -x%x\n", rval);
+		return -4;
+	}
 
     return 0;
 }

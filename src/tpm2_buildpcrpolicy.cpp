@@ -145,12 +145,12 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
     if( rval != TPM_RC_SUCCESS )
         return rval;
 
-    return rval;
+   return rval;
 }
 
 
 
-TPM_RC BuildPolicy(bool trial)
+TPM_RC BuildPolicy(int trial, int write)
 {
     SESSION *policySession = 0;
     TPM2B_DIGEST policyDigest;
@@ -195,15 +195,63 @@ TPM_RC BuildPolicy(bool trial)
 	} 
 
 	printf("policyDigest.size = %d", policyDigest.t.size); 
-
-    // Write PCR Policy in the file.
-    if(fp != NULL &&
-        fwrite(policyDigest.t.buffer, sizeof(BYTE), policyDigest.t.size, fp) != policyDigest.t.size)
-    {
-        printf("write to file %s failed!\n", outFilePath);
-        return -1;
-    }
+	
+	if(write)
+	{
+		// Write PCR Policy in the file.
+		if(fp != NULL &&
+			fwrite(policyDigest.t.buffer, sizeof(BYTE), policyDigest.t.size, fp) != policyDigest.t.size)
+		{
+			printf("write to file %s failed!\n", outFilePath);
+			return -1;
+		}
+	}
     return rval;
+}
+
+TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial)
+{
+    TPM2B_DIGEST policyDigest;
+    policyDigest.t.size = 0;
+    TPM2B_ENCRYPTED_SECRET  encryptedSalt = { {0}, };
+    TPMT_SYM_DEF symmetric;
+    TPM_RC rval;
+    TPM2B_NONCE nonceCaller;
+
+    nonceCaller.t.size = 0;
+
+    // Start policy session.
+    symmetric.algorithm = TPM_ALG_NULL;
+    rval = StartAuthSessionWithParams( policySession, TPM_RH_NULL, 0, TPM_RH_NULL, 0, &nonceCaller, &encryptedSalt, 
+        trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, TPM_ALG_SHA1 );
+    if( rval != TPM_RC_SUCCESS )
+        return rval;
+
+    // Send policy command.
+    rval = BuildPcrPolicy( sysContext, *policySession, &policyDigest );
+    if( rval != TPM_RC_SUCCESS )
+        return rval;
+
+    // Get policy hash.
+    INIT_SIMPLE_TPM2B_SIZE( policyDigest );
+    rval = Tss2_Sys_PolicyGetDigest( sysContext, (*policySession)->sessionHandle,
+            0, &policyDigest, 0 );
+    if( rval != TPM_RC_SUCCESS )
+        return rval;
+
+   	if( trial )
+	{ 
+		// Need to flush the session here.
+		rval = Tss2_Sys_FlushContext( sysContext, (*policySession)->sessionHandle );
+		if( rval != TPM_RC_SUCCESS )
+			return rval;
+
+		// And remove the session from sessions table.
+		rval = EndAuthSession( *policySession );
+		if( rval != TPM_RC_SUCCESS )
+			return rval;
+	} 
+
 }
 
 void showHelp(const char *name)
@@ -479,7 +527,7 @@ int main(int argc, char *argv[])
 
     prepareTest(hostName, port, debugLevel);
 
-    returnVal = BuildPolicy(t_flag);        
+    returnVal = BuildPolicy(t_flag, o_flag);        
 
     finishTest();
 
