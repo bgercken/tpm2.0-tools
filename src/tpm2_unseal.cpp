@@ -56,8 +56,9 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
     TSS2_SYS_RSP_AUTHS sessionsDataOut;
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
+	TPM2B_DIGEST policyDigest; //unused for now here but BuildPolicyExternal needs to return the policy for sealdata.
 
-	rval = BuildPolicyExternal(sysContext, &policySession, false);  //Build real policy, don't write to file
+	rval = BuildPolicyExternal(sysContext, &policySession, false, 15, &policyDigest);  //Build real policy, don't write to file
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
