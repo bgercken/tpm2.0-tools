@@ -46,8 +46,9 @@
 int debugLevel = 0;
 TPMS_AUTH_COMMAND sessionData;
 bool hexPasswd = false;
+TPM_HANDLE handle2048rsa;
 
-UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
+UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate)
 {
     UINT32 rval;
 	SESSION *policySession;
@@ -57,6 +58,8 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
 	TPM2B_DIGEST policyDigest; //unused for now here but BuildPolicyExternal needs to return the policy for sealdata.
+
+    TPM2B_NAME nameExt = { { sizeof(TPM2B_NAME)-2, } };
 
 	rval = BuildPolicyExternal(sysContext, &policySession, false, 15, &policyDigest);  //Build real policy, don't write to file
 	if(rval != TPM_RC_SUCCESS)
@@ -76,7 +79,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
     sessionsDataOut.rspAuthsCount = 1;
     sessionsData.cmdAuthsCount = 1;
 
-    sessionData.sessionHandle = policySession->sessionHandle;
+    sessionData.sessionHandle = TPM_RS_PW;
     sessionData.nonce.t.size = 0;
     *((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
 	sessionData.sessionAttributes.continueSession = 1;
@@ -94,7 +97,15 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag)
         }
     }
 
-    rval = Tss2_Sys_Unseal(sysContext, itemHandle, &sessionsData, &outData, &sessionsDataOut);
+    rval = Tss2_Sys_Load(sysContext, itemHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
+    if(rval != TPM_RC_SUCCESS)
+    {
+        printf("\nLoad Object Failed ! ErrorCode: 0x%0x\n\n",rval);
+        return -1;
+    }
+
+    sessionData.sessionHandle = policySession->sessionHandle;
+    rval = Tss2_Sys_Unseal(sysContext, handle2048rsa, &sessionsData, &outData, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("Unseal failed. Error Code: 0x%x\n", rval);
@@ -139,6 +150,9 @@ void showHelp(const char *name)
         "-H, --item    <itemHandle>     item handle, handle of a loaded data object\n"
         "-c, --itemContext <filename>   filename for item context\n"
         "-P, --pwdi    <itemPassword>   item handle password, optional\n"
+        "-u, --pubfile   <publicKeyFileName>   The public portion of the object\n"
+        "-r, --privfile  <privateKeyFileName>  The sensitive portion of the object\n"
+        "-C, --context <filename>   The file to save the object context, optional"
         "-o, --outfile <outPutFilename> Output file name, containing the unsealed data\n"
         "-X, --passwdInHex              passwords given by any options are hex format.\n"
         "-p, --port  <port number>  The Port number, default is %d, optional\n"
@@ -160,24 +174,33 @@ int main(int argc, char* argv[])
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 
-    TPMI_DH_OBJECT itemHandle;
+    TPMI_DH_OBJECT itemHandle, parentHandle;
+    TPM2B_PUBLIC  inPublic;
+    TPM2B_PRIVATE inPrivate;
     char outFilePath[PATH_MAX] = {0};
     char *contextItemFile = NULL;
+    char *contextLoadFile = NULL;
+	UINT16 size;
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
+    memset(&inPublic,0,sizeof(TPM2B_PUBLIC));
+    memset(&inPrivate,0,sizeof(TPM2B_SENSITIVE));
     int opt = -1;
-    const char *optstring = "hvH:P:o:p:d:c:X";
+    const char *optstring = "hvH:P:o:p:d:c:r:u:C:X";
     static struct option long_options[] = {
       {"help",0,NULL,'h'},
       {"version",0,NULL,'v'},
       {"item",1,NULL,'H'},
       {"pwdi",1,NULL,'P'},
       {"outfile",1,NULL,'o'},
+      {"pubfile",1,NULL,'u'},
+      {"privfile",1,NULL,'r'},
       {"port",1,NULL,'p'},
       {"debugLevel",1,NULL,'d'},
       {"itemContext",1,NULL,'c'},
+      {"loadContext",1,NULL,'C'},
       {"passwdInHex",0,NULL,'X'},
       {0,0,0,0}
     };
@@ -189,6 +212,9 @@ int main(int argc, char* argv[])
         H_flag = 0,
         P_flag = 0,
         c_flag = 0,
+        C_flag = 0,
+        u_flag = 0,
+        r_flag = 0,
         o_flag = 0;
 
     if(argc == 1)
@@ -258,6 +284,36 @@ int main(int argc, char* argv[])
             printf("contextItemFile = %s\n", contextItemFile);
             c_flag = 1;
             break;
+        case 'C':
+            contextLoadFile = optarg;
+            if(contextLoadFile == NULL || contextLoadFile[0] == '\0')
+            {
+                returnVal = -6;
+                break;
+            }
+            printf("contextLoadFile = %s\n", contextLoadFile);
+            C_flag = 1;
+			break;
+        case 'u':
+            size = sizeof(inPublic);
+			printf("inPublic: %s\n", optarg);
+            if(loadDataFromFile(optarg, (UINT8 *)&inPublic, &size) != 0)
+            {
+                returnVal = -3;
+                break;
+            }
+            u_flag = 1;
+            break;
+        case 'r':
+            size = sizeof(inPrivate);
+			printf("inPrivate: %s\n", optarg);
+            if(loadDataFromFile(optarg, (UINT8 *)&inPrivate, &size) != 0)
+            {
+                returnVal = -4;
+                break;
+            }
+            r_flag = 1;
+            break;
         case 'X':
             hexPasswd = true;
             break;
@@ -279,7 +335,7 @@ int main(int argc, char* argv[])
     if(returnVal != 0)
         return returnVal;
 
-    flagCnt = h_flag + v_flag + H_flag + o_flag + c_flag;
+    flagCnt = h_flag + v_flag + H_flag + o_flag + c_flag + r_flag + u_flag;
     if(flagCnt == 1)
     {
         if(h_flag == 1)
@@ -292,14 +348,16 @@ int main(int argc, char* argv[])
             return -9;
         }
     }
-    else if(flagCnt == 2 && (H_flag == 1 || c_flag ==1) && o_flag == 1)
+    else if(flagCnt == 4 && (H_flag == 1 || c_flag ==1) && o_flag == 1 && r_flag == 1 && u_flag == 1 )
     {
         prepareTest(hostName, port, debugLevel);
-
+		
         if(c_flag)
-            returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile);
+            returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
-            returnVal = unseal(itemHandle, outFilePath, P_flag);
+            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate);
+        if (returnVal == 0 && C_flag)
+			returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextLoadFile); 
 
         finishTest();
 
