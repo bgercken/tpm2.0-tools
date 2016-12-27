@@ -80,10 +80,13 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, in
     switch(type)
     {
     case TPM_ALG_RSA:
-        inPublic->t.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM_ALG_NULL;
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM_ALG_AES;
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.keyBits.aes = 128;
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.mode.aes = TPM_ALG_CFB;
         inPublic->t.publicArea.parameters.rsaDetail.scheme.scheme = TPM_ALG_NULL;
         inPublic->t.publicArea.parameters.rsaDetail.keyBits = 2048;
         inPublic->t.publicArea.parameters.rsaDetail.exponent = 0;
+		inPublic->t.publicArea.objectAttributes.sensitiveDataOrigin = 0;
         inPublic->t.publicArea.unique.rsa.t.size = 0;
         break;
 
