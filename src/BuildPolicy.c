@@ -21,7 +21,7 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
 	pcrDigest.t.size = 0;
 
 	pcrs.count = 1;
-	pcrs.pcrSelections[0].hash = TPM_ALG_SHA1;
+	pcrs.pcrSelections[0].hash = TPM_ALG_SHA256;
 	pcrs.pcrSelections[0].sizeofSelect = 3;
 	pcrs.pcrSelections[0].pcrSelect[0] = 0;
 	pcrs.pcrSelections[0].pcrSelect[1] = 0;
@@ -63,7 +63,7 @@ TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession
     // Start policy session.
     symmetric.algorithm = TPM_ALG_NULL;
     rval = StartAuthSessionWithParams( policySession, TPM_RH_NULL, 0, TPM_RH_NULL, 0, &nonceCaller, &encryptedSalt, 
-        trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, TPM_ALG_SHA1 );
+        trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, TPM_ALG_SHA256 );
     if( rval != TPM_RC_SUCCESS )
 	{
 		printf("BuildPolicyExternal, Unable to Start Auth Session, Error Code: 0x%x\n", rval);
