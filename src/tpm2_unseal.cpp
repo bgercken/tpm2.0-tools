@@ -48,7 +48,7 @@ TPMS_AUTH_COMMAND sessionData;
 bool hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 
-UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate)
+UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg)
 {
     UINT32 rval;
 	SESSION *policySession;
@@ -61,7 +61,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 
     TPM2B_NAME nameExt = { { sizeof(TPM2B_NAME)-2, } };
 
-	rval = BuildPolicyExternal(sysContext, &policySession, false, 15, &policyDigest);  //Build real policy, don't write to file
+	rval = BuildPolicyExternal(sysContext, &policySession, false, 15, &policyDigest, nameAlg);  //Build real policy, don't write to file
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
@@ -156,6 +156,13 @@ void showHelp(const char *name)
         "-o, --outfile <outPutFilename> Output file name, containing the unsealed data\n"
         "-X, --passwdInHex              passwords given by any options are hex format.\n"
         "-p, --port  <port number>  The Port number, default is %d, optional\n"
+        "-n, --pcr  <pcrID>  The PCR used in the gated policy\n"
+        "-g, --halg   <hexAlg>  algorithm used for computing the Name of the object\n"
+            "\t0x0004  TPM_ALG_SHA1\n"
+            "\t0x000B  TPM_ALG_SHA256\n"
+            "\t0x000C  TPM_ALG_SHA384\n"
+            "\t0x000D  TPM_ALG_SHA512\n"
+            "\t0x0012  TPM_ALG_SM3_256\n"
         "-d, --debugLevel <0|1|2|3> The level of debug message, default is 0, optional\n"
             "\t0 (high level test results)\n"
             "\t1 (test app send/receive byte streams)\n"
@@ -173,7 +180,8 @@ int main(int argc, char* argv[])
 {
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
-
+	
+	TPMI_ALG_HASH nameAlg;
     TPMI_DH_OBJECT itemHandle, parentHandle;
     TPM2B_PUBLIC  inPublic;
     TPM2B_PRIVATE inPrivate;
@@ -181,6 +189,7 @@ int main(int argc, char* argv[])
     char *contextItemFile = NULL;
     char *contextLoadFile = NULL;
 	UINT16 size;
+	UINT32 pcr = -1;
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
@@ -188,7 +197,7 @@ int main(int argc, char* argv[])
     memset(&inPublic,0,sizeof(TPM2B_PUBLIC));
     memset(&inPrivate,0,sizeof(TPM2B_SENSITIVE));
     int opt = -1;
-    const char *optstring = "hvH:P:o:p:d:c:r:u:C:X";
+    const char *optstring = "hvH:P:o:p:d:c:r:u:C:g:n:X";
     static struct option long_options[] = {
       {"help",0,NULL,'h'},
       {"version",0,NULL,'v'},
@@ -200,6 +209,8 @@ int main(int argc, char* argv[])
       {"port",1,NULL,'p'},
       {"debugLevel",1,NULL,'d'},
       {"itemContext",1,NULL,'c'},
+      {"halg",1,NULL,'g'},
+      {"pcr",1,NULL,'n'},
       {"loadContext",1,NULL,'C'},
       {"passwdInHex",0,NULL,'X'},
       {0,0,0,0}
@@ -215,6 +226,8 @@ int main(int argc, char* argv[])
         C_flag = 0,
         u_flag = 0,
         r_flag = 0,
+        g_flag = 0,
+        n_flag = 0,
         o_flag = 0;
 
     if(argc == 1)
@@ -314,6 +327,24 @@ int main(int argc, char* argv[])
             }
             r_flag = 1;
             break;
+        case 'g':
+            if(getSizeUint16Hex(optarg,&nameAlg) != 0)
+            {
+                showArgError(optarg, argv[0]);
+                returnVal = -4;
+                break;
+            }
+            printf("nameAlg = 0x%4.4x\n", nameAlg);
+            g_flag = 1;
+            break;
+		case 'n':
+			if ( getPcrId(optarg, &pcr) )
+			{
+				printf("Invalid pcr value.\n");
+				returnVal = -7;
+			}
+			n_flag = 1;
+			break;
         case 'X':
             hexPasswd = true;
             break;
@@ -335,7 +366,7 @@ int main(int argc, char* argv[])
     if(returnVal != 0)
         return returnVal;
 
-    flagCnt = h_flag + v_flag + H_flag + o_flag + c_flag + r_flag + u_flag;
+    flagCnt = h_flag + v_flag + H_flag + o_flag + c_flag + r_flag + u_flag + g_flag + n_flag;
     if(flagCnt == 1)
     {
         if(h_flag == 1)
@@ -348,14 +379,14 @@ int main(int argc, char* argv[])
             return -9;
         }
     }
-    else if(flagCnt == 4 && (H_flag == 1 || c_flag ==1) && o_flag == 1 && r_flag == 1 && u_flag == 1 )
+    else if(flagCnt == 6 && (H_flag == 1 || c_flag ==1) && o_flag == 1 && r_flag == 1 && u_flag == 1 && n_flag == 1)
     {
         prepareTest(hostName, port, debugLevel);
 		
         if(c_flag)
             returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
-            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate);
+            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg);
         if (returnVal == 0 && C_flag)
 			returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextLoadFile); 
 

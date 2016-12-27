@@ -9,7 +9,7 @@
 
 #define INIT_SIMPLE_TPM2B_SIZE( type ) (type).t.size = sizeof( type ) - 2;
 
-TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_DIGEST *policyDigest, UINT32 pcr)
+TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_DIGEST *policyDigest, UINT32 pcr, TPMI_ALG_HASH nameAlg)
 {
 	TPM_RC rval = TPM_RC_SUCCESS;
 	TPM2B_DIGEST pcrDigest;
@@ -21,7 +21,7 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
 	pcrDigest.t.size = 0;
 
 	pcrs.count = 1;
-	pcrs.pcrSelections[0].hash = TPM_ALG_SHA256;
+	pcrs.pcrSelections[0].hash = nameAlg;
 	pcrs.pcrSelections[0].sizeofSelect = 3;
 	pcrs.pcrSelections[0].pcrSelect[0] = 0;
 	pcrs.pcrSelections[0].pcrSelect[1] = 0;
@@ -49,7 +49,7 @@ TPM_RC BuildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM
    return rval;
 }
 
-TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial, UINT32 pcr, TPM2B_DIGEST *policyDigestOut)
+TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial, UINT32 pcr, TPM2B_DIGEST *policyDigestOut, TPMI_ALG_HASH nameAlg)
 {
     TPM2B_DIGEST policyDigest;
     policyDigest.t.size = 0;
@@ -71,7 +71,7 @@ TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession
 	}
 
     // Send policy command.
-    rval = BuildPcrPolicy( sysContext, *policySession, &policyDigest, pcr );
+    rval = BuildPcrPolicy( sysContext, *policySession, &policyDigest, pcr, nameAlg );
     if( rval != TPM_RC_SUCCESS )
 	{
 		printf("BuildPCRPolicy, Error Code: 0x%x\n", rval);

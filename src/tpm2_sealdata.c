@@ -366,7 +366,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	TPM2B_DIGEST policyDigest;
 
 	//Build a trial policy gated by the provided PCR
-	rval = BuildPolicyExternal(sysContext, &policySession, true, pcr, &policyDigest);
+	rval = BuildPolicyExternal(sysContext, &policySession, true, pcr, &policyDigest, nameAlg);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
