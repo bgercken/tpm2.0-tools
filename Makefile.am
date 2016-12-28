@@ -75,7 +75,8 @@ sbin_PROGRAMS = src/tpm2_listpcrs \
 		  src/tpm2_rc_decode \
 		  src/tpm2_extendpcr \
 		  src/tpm2_buildpcrpolicy \
-		  src/tpm2_sealdata
+		  src/tpm2_sealdata \
+		  src/tpm2_getcapabilities
 
 if UNIT
 check_PROGRAMS = \
@@ -140,6 +141,7 @@ src_tpm2_rc_decode_SOURCES = src/rc-decode.c src/tpm2_rc_decode.c
 src_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.cpp
 src_tpm2_buildpcrpolicy_SOURCES = src/tpm2_buildpcrpolicy.cpp
 src_tpm2_sealdata_SOURCES = src/tpm2_sealdata.c
+src_tpm2_getcapabilities_SOURCES = src/tpm2_getcapabilities.c
 
 if UNIT
 test_tpm2_rc_decode_unit_CFLAGS  = $(AM_CXXFLAGS) $(CMOCKA_CFLAGS)
