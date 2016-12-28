@@ -358,7 +358,7 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 
 //TODO: Might need to include inSensitive for CreatePrimary...maybe
 int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
-			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, UINT32 pcr, TPMI_RH_HIERARCHY hierarchy)
+			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
 {
 
 	//Create trial policy if pcr specified
@@ -370,7 +370,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	TPM2B_DIGEST policyDigest;
 
 	//Build a trial policy gated by the provided PCR
-	rval = BuildPolicyExternal(sysContext, &policySession, true, pcr, &policyDigest, nameAlg);
+	rval = BuildPolicyExternal(sysContext, &policySession, true, pcrList, pcrCount, &policyDigest, nameAlg);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
@@ -459,6 +459,8 @@ int main(int argc, char* argv[])
     TPMI_RH_HIERARCHY hierarchy = TPM_RH_NULL;
 
 	UINT32 pcr = -1;
+	UINT32 pcrCount = 0;
+	UINT32 pcrList[24];
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
@@ -609,6 +611,8 @@ int main(int argc, char* argv[])
 				returnVal = -11;
 			}
 			r_flag = 1;
+			pcrList[pcrCount] = pcr;
+			pcrCount++;
 			break;
         case 'X':
             hexPasswd = true;
@@ -682,7 +686,7 @@ int main(int argc, char* argv[])
         prepareTest(hostName, port, debugLevel);
 
         if(returnVal == 0)
-            returnVal = seal(&inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcr, hierarchy);
+            returnVal = seal(&inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcrList, pcrCount, hierarchy);
 
         if (returnVal == 0 && n_flag)
             returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextFilePath);
