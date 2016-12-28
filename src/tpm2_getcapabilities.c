@@ -48,6 +48,18 @@ TPM_RC GetCapabilities()
 			capabilityData.data.tpmProperties.tpmProperty[0].property,
 			manuID);
 	
+	rval = Tss2_Sys_GetCapability( sysContext, 0, TPM_CAP_TPM_PROPERTIES, TPM_PT_PERMANENT, 1, &moreData, &capabilityData, 0);
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("Failed to get TPM_PT_PERMANENT, error code: 0x%0x\n", rval);
+		return rval;
+	}
+
+	printf("\t\tcount: %d, property: %x, value: %d, more:%d \n",
+			capabilityData.data.tpmProperties.count,
+			capabilityData.data.tpmProperties.tpmProperty[0].property,
+			capabilityData.data.tpmProperties.tpmProperty[0].value & TPMA_PERMANENT_OWNERAUTHSET,
+			moreData);
 	//printf("PCRs implemented: %x\n", capabilityData.data.pcrProperties.pcrProperty[0].pcrSelect[0]);
 	return rval;
 

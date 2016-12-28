@@ -208,6 +208,10 @@ TPM_RC Create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITI
 
     sessionsData.cmdAuthsCount = 1;
     sessionsData.cmdAuths[0] = &sessionData;
+
+	//Clear hmac password field in sessionData, we're sealing using adminWithPolicy
+	sessionData.hmac.t.size = 0;
+
     if (sessionData.hmac.t.size > 0 && hexPasswd)
     {
         sessionData.hmac.t.size = sizeof(sessionData.hmac) - 2;
@@ -267,7 +271,7 @@ TPM_RC Create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITI
 }
 
 
-TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg)
+TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
 {
 	TPM_RC rval;
 	TPMS_AUTH_RESPONSE sessionDataOut;
@@ -297,12 +301,11 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 	sessionData.sessionHandle = TPM_RS_PW;
 	sessionData.nonce.t.size = 0;
 
-	/*if(P_flag == 0)
+	if(P_flag == 0)
 		sessionData.hmac.t.size = 0;
-	*/
-	sessionData.hmac.t.size = 0;
+	
 	*((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
-	/*
+	
 	if (sessionData.hmac.t.size > 0 && hexPasswd)
 	{
 		sessionData.hmac.t.size = sizeof(sessionData.hmac) - 2;
@@ -314,7 +317,8 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 			return -1;
 		}
 	}
-	
+
+	/*	
 	if(K_flag == 0)
 		inSensitive->t.sensitive.userAuth.t.size = 0;
 	if (inSensitive->t.sensitive.userAuth.t.size > 0 && hexPasswd)
@@ -354,7 +358,7 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 
 //TODO: Might need to include inSensitive for CreatePrimary...maybe
 int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
-			int o_flag, int O_flag, int I_flag, int b_flag, UINT32 objectAttributes, UINT32 pcr, TPMI_RH_HIERARCHY hierarchy)
+			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, UINT32 pcr, TPMI_RH_HIERARCHY hierarchy)
 {
 
 	//Create trial policy if pcr specified
@@ -374,7 +378,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	}
 	
 	//Create the parent context
-	rval = CreatePrimary(hierarchy, &inPublic, TPM_ALG_RSA, nameAlg); 
+	rval = CreatePrimary(hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("CreatePrimary failed, errorcode: 0x%x\n", rval);
@@ -400,13 +404,13 @@ void showHelp(const char *name)
         "\n"
         "-h, --help             Display command tool usage info;\n"
         "-v, --version          Display command tool version info\n"
-        "-P, --pwdp   <string>  password for parent key, optional\n"
         "-K, --pwdk   <string>  password for key, optional\n"
         "-A, --auth <o | p |...>  the authorization used to authorize thecommands\n"
             "\to  TPM_RH_OWNER\n"
             "\tp  TPM_RH_PLATFORM\n"
             "\te  TPM_RH_ENDORSEMENT\n"
             "\tn  TPM_RH_NULL\n"
+        "-P, --pwdp <string>      password for hierarchy, optional\n"
         "-g, --halg   <hexAlg>  algorithm used for computing the Name of the object\n"
             "\t0x0004  TPM_ALG_SHA1\n"
             "\t0x000B  TPM_ALG_SHA256\n"
@@ -678,7 +682,7 @@ int main(int argc, char* argv[])
         prepareTest(hostName, port, debugLevel);
 
         if(returnVal == 0)
-            returnVal = seal(&inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, objectAttributes, pcr, hierarchy);
+            returnVal = seal(&inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcr, hierarchy);
 
         if (returnVal == 0 && n_flag)
             returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextFilePath);
