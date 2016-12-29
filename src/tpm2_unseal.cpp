@@ -118,7 +118,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
         printf(" 0x%02x", outData.t.buffer[i]);
     printf("\n");
 
-    if(saveDataToFile(outFileName, (UINT8 *)&outData, sizeof(outData)))
+    if(saveDataToFile(outFileName, (UINT8 *)outData.t.buffer, outData.t.size))
     {
         printf("Failed to save unsealed data into %s\n", outFileName);
         return -2;
