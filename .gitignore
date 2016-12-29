@@ -3,6 +3,7 @@
 *.log
 *.o
 *.trs
+cscope.*
 aclocal.m4
 autom4te.cache/
 compile
