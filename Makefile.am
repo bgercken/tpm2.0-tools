@@ -77,7 +77,7 @@ sbin_PROGRAMS = src/tpm2_listpcrs \
 		  src/tpm2_buildpcrpolicy \
 		  src/tpm2_sealdata \
 		  src/tpm2_getcapabilities \
-		  src/tpm2_isowneda \
+		  src/tpm2_isowned \
 		  src/tpm2_unsealdata
  
 if UNIT
