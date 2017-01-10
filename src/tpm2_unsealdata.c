@@ -33,6 +33,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
@@ -45,7 +46,7 @@
 
 int debugLevel = 0;
 TPMS_AUTH_COMMAND sessionData;
-bool hexPasswd = false;
+int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 
 UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
