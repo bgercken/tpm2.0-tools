@@ -49,6 +49,78 @@ TPMS_AUTH_COMMAND sessionData;
 int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 
+int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
+{
+    switch(nameAlg)
+    {
+    case TPM_ALG_SHA1:
+    case TPM_ALG_SHA256:
+    case TPM_ALG_SHA384:
+    case TPM_ALG_SHA512:
+    case TPM_ALG_SM3_256:
+    case TPM_ALG_NULL:
+        inPublic->t.publicArea.nameAlg = nameAlg;
+        break;
+    default:
+        printf("nameAlg algrithm: 0x%0x not support !\n", nameAlg);
+        return -1;
+    }
+
+    // First clear attributes bit field.
+    *(UINT32 *)&(inPublic->t.publicArea.objectAttributes) = 0;
+    inPublic->t.publicArea.objectAttributes.restricted = 1;
+    inPublic->t.publicArea.objectAttributes.userWithAuth = 1;
+    inPublic->t.publicArea.objectAttributes.decrypt = 1;
+    inPublic->t.publicArea.objectAttributes.fixedTPM = 1;
+    inPublic->t.publicArea.objectAttributes.fixedParent = 1;
+    inPublic->t.publicArea.objectAttributes.sensitiveDataOrigin = 1;
+    inPublic->t.publicArea.authPolicy.t.size = 0;
+
+    inPublic->t.publicArea.type = type;
+    switch(type)
+    {
+    case TPM_ALG_RSA:
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.algorithm = TPM_ALG_AES;
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.keyBits.aes = 128;
+        inPublic->t.publicArea.parameters.rsaDetail.symmetric.mode.aes = TPM_ALG_CFB;
+        inPublic->t.publicArea.parameters.rsaDetail.scheme.scheme = TPM_ALG_NULL;
+        inPublic->t.publicArea.parameters.rsaDetail.keyBits = 2048;
+        inPublic->t.publicArea.parameters.rsaDetail.exponent = 0;
+        inPublic->t.publicArea.unique.rsa.t.size = 0;
+        break;
+
+    case TPM_ALG_KEYEDHASH:
+        inPublic->t.publicArea.parameters.keyedHashDetail.scheme.scheme = TPM_ALG_XOR;
+        inPublic->t.publicArea.parameters.keyedHashDetail.scheme.details.exclusiveOr.hashAlg = TPM_ALG_SHA256;
+        inPublic->t.publicArea.parameters.keyedHashDetail.scheme.details.exclusiveOr.kdf = TPM_ALG_KDF1_SP800_108;
+        inPublic->t.publicArea.unique.keyedHash.t.size = 0;
+        break;
+
+    case TPM_ALG_ECC:
+        inPublic->t.publicArea.parameters.eccDetail.symmetric.algorithm = TPM_ALG_AES;
+        inPublic->t.publicArea.parameters.eccDetail.symmetric.keyBits.aes = 128;
+        inPublic->t.publicArea.parameters.eccDetail.symmetric.mode.sym = TPM_ALG_CFB;
+        inPublic->t.publicArea.parameters.eccDetail.scheme.scheme = TPM_ALG_NULL;
+        inPublic->t.publicArea.parameters.eccDetail.curveID = TPM_ECC_NIST_P256;
+        inPublic->t.publicArea.parameters.eccDetail.kdf.scheme = TPM_ALG_NULL;
+        inPublic->t.publicArea.unique.ecc.x.t.size = 0;
+        inPublic->t.publicArea.unique.ecc.y.t.size = 0;
+        break;
+
+    case TPM_ALG_SYMCIPHER:
+        inPublic->t.publicArea.parameters.symDetail.sym.algorithm = TPM_ALG_AES;
+        inPublic->t.publicArea.parameters.symDetail.sym.keyBits.sym = 128;
+        inPublic->t.publicArea.parameters.symDetail.sym.mode.sym = TPM_ALG_CFB;
+        inPublic->t.publicArea.unique.sym.t.size = 0;
+        break;
+
+    default:
+        printf("type algrithm: 0x%0x not support !\n",type);
+        return -2;
+    }
+    return 0;
+}
+
 TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
 {
 	TPM_RC rval;
