@@ -49,8 +49,78 @@ TPMS_AUTH_COMMAND sessionData;
 int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 
+TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
+{
+	TPM_RC rval;
+	TPMS_AUTH_RESPONSE sessionDataOut;
+	TSS2_SYS_CMD_AUTHS sessionsData;
+	TSS2_SYS_RSP_AUTHS sessionsDataOut;
+	TPMS_AUTH_COMMAND *sessionDataArray[1];
+	TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
+
+	TPM2B_DATA              outsideInfo = { { 0, } };
+	TPML_PCR_SELECTION      creationPCR;
+	TPM2B_NAME              name = { { sizeof(TPM2B_NAME)-2, } };
+	TPM2B_PUBLIC            outPublic = { { 0, } };
+	TPM2B_CREATION_DATA     creationData = { { 0, } };
+	TPM2B_DIGEST            creationHash = { { sizeof(TPM2B_DIGEST)-2, } };
+	TPMT_TK_CREATION        creationTicket = { 0, };
+	TPM2B_SENSITIVE_CREATE inSensitive;
+
+	sessionDataArray[0] = &sessionData;
+	sessionDataOutArray[0] = &sessionDataOut;
+
+	sessionsDataOut.rspAuths = &sessionDataOutArray[0];
+	sessionsData.cmdAuths = &sessionDataArray[0];
+
+	sessionsData.cmdAuthsCount = 1;
+	sessionsDataOut.rspAuthsCount = 1;
+
+	sessionData.sessionHandle = TPM_RS_PW;
+	sessionData.nonce.t.size = 0;
+
+	if(P_flag == 0)
+		sessionData.hmac.t.size = 0;
+	
+	*((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
+	
+	if (sessionData.hmac.t.size > 0 && hexPasswd)
+	{
+		sessionData.hmac.t.size = sizeof(sessionData.hmac) - 2;
+		if (hex2ByteStructure((char *)sessionData.hmac.t.buffer,
+							  &sessionData.hmac.t.size,
+							  sessionData.hmac.t.buffer) != 0)
+		{
+			printf( "Failed to convert Hex format password for hierarchy Passwd.\n");
+			return -1;
+		}
+	}
+
+	//remove this line if uncommenting above block
+	inSensitive.t.sensitive.userAuth.t.size = 0;
+
+	inSensitive.t.sensitive.data.t.size = 0;
+	inSensitive.t.size = inSensitive.t.sensitive.userAuth.b.size + 2;
+
+    if(setAlg(type, nameAlg, inPublic))
+        return -1;
+
+    creationPCR.count = 0;
+
+    rval = Tss2_Sys_CreatePrimary(sysContext, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &handle2048rsa, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
+    if(rval != TPM_RC_SUCCESS)
+    {
+        printf("\nCreatePrimary Failed ! ErrorCode: 0x%0x\n\n",rval);
+        return -2;
+    }
+    printf("\nCreatePrimary Succeed ! Handle: 0x%8.8x\n\n",handle2048rsa);
+
+	return 0;
+}
+
+
 UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
-				UINT32 *pcrList, UINT32 pcrCount)
+				UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
 {
     UINT32 rval;
 	SESSION *policySession;
@@ -68,6 +138,17 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 	{
 		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
 		return rval;
+	}
+
+	//Create the parent context
+	if(A_flag)
+	{
+		rval = CreatePrimary(hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
+		if(rval != TPM_RC_SUCCESS)
+		{
+			printf("CreatePrimary failed, errorcode: 0x%x\n", rval);
+			return rval;
+		}
 	}
 
     TPM2B_SENSITIVE_DATA outData = {{sizeof(TPM2B_SENSITIVE_DATA)-2, }};
@@ -149,6 +230,11 @@ void showHelp(const char *name)
         "\n"
         "-h, --help               Display command tool usage info;\n"
         "-v, --version            Display command tool version info\n"
+        "-A, --auth <o | p |...>  the authorization used to authorize thecommands\n"
+            "\to  TPM_RH_OWNER\n"
+            "\tp  TPM_RH_PLATFORM\n"
+            "\te  TPM_RH_ENDORSEMENT\n"
+            "\tn  TPM_RH_NULL\n"
         "-H, --item    <itemHandle>     item handle, handle of a loaded data object\n"
         "-c, --itemContext <filename>   filename for item context\n"
         "-P, --pwdi    <itemPassword>   item handle password, optional\n"
@@ -190,6 +276,7 @@ int main(int argc, char* argv[])
     char outFilePath[PATH_MAX] = {0};
     char *contextItemFile = NULL;
     char *contextLoadFile = NULL;
+    TPMI_RH_HIERARCHY hierarchy = TPM_RH_NULL;
 	UINT16 size;
 	UINT32 pcr = -1;
 	UINT32 pcrCount = 0;
@@ -201,12 +288,13 @@ int main(int argc, char* argv[])
     memset(&inPublic,0,sizeof(TPM2B_PUBLIC));
     memset(&inPrivate,0,sizeof(TPM2B_SENSITIVE));
     int opt = -1;
-    const char *optstring = "hvH:P:o:p:d:c:r:u:C:g:n:X";
+    const char *optstring = "hvH:P:o:p:d:c:r:u:C:g:n:A:X";
     static struct option long_options[] = {
       {"help",0,NULL,'h'},
       {"version",0,NULL,'v'},
       {"item",1,NULL,'H'},
       {"pwdi",1,NULL,'P'},
+      {"auth",1,NULL,'A'},
       {"outfile",1,NULL,'o'},
       {"pubfile",1,NULL,'u'},
       {"privfile",1,NULL,'n'},
@@ -232,6 +320,7 @@ int main(int argc, char* argv[])
         r_flag = 0,
         g_flag = 0,
         n_flag = 0,
+        A_flag = 0,
         o_flag = 0;
 
     if(argc == 1)
@@ -249,6 +338,22 @@ int main(int argc, char* argv[])
             break;
         case 'v':
             v_flag = 1;
+            break;
+		case 'A':
+            if(strcmp(optarg,"o") == 0 || strcmp(optarg,"O") == 0)
+                hierarchy = TPM_RH_OWNER;
+            else if(strcmp(optarg,"p") == 0 || strcmp(optarg,"P") == 0)
+                hierarchy = TPM_RH_PLATFORM;
+            else if(strcmp(optarg,"e") == 0 || strcmp(optarg,"E") == 0)
+                hierarchy = TPM_RH_ENDORSEMENT;
+            else if(strcmp(optarg,"n") == 0 || strcmp(optarg,"N") == 0)
+                hierarchy = TPM_RH_NULL;
+            else
+            {
+                returnVal = -19;
+                break;
+            }
+            A_flag = 1;
             break;
         case 'H':
             if(getSizeUint32Hex(optarg, &itemHandle) != 0)
@@ -385,14 +490,14 @@ int main(int argc, char* argv[])
             return -9;
         }
     }
-    else if(flagCnt == 6 && (H_flag == 1 || c_flag ==1) && o_flag == 1 && n_flag == 1 && u_flag == 1 && r_flag == 1)
+    else if(flagCnt == 6 && (H_flag == 1 || c_flag ==1 || A_flag == 1) && o_flag == 1 && n_flag == 1 && u_flag == 1 && r_flag == 1)
     {
         prepareTest(hostName, port, debugLevel);
 		
-        if(c_flag)
+        if(c_flag && checkOutFile(contextItemFile))
             returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
-            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount);
+            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
         if (returnVal == 0 && C_flag)
 			returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextLoadFile); 
 
