@@ -562,7 +562,7 @@ int main(int argc, char* argv[])
             return -9;
         }
     }
-    else if(flagCnt == 6 && (H_flag == 1 || c_flag ==1 || A_flag == 1) && o_flag == 1 && n_flag == 1 && u_flag == 1 && r_flag == 1)
+    else if(flagCnt >= 5 && (H_flag == 1 || c_flag ==1 || A_flag == 1) && o_flag == 1 && n_flag == 1 && u_flag == 1 && r_flag == 1)
     {
         prepareTest(hostName, port, debugLevel);
 		
