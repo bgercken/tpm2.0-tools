@@ -48,6 +48,7 @@ int debugLevel = 0;
 TPMS_AUTH_COMMAND sessionData;
 int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
+TPM_HANDLE primaryHandle;
 
 int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
 {
@@ -179,13 +180,13 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 
     creationPCR.count = 0;
 
-    rval = Tss2_Sys_CreatePrimary(sysContext, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &handle2048rsa, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
+    rval = Tss2_Sys_CreatePrimary(sysContext, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &primaryHandle, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nCreatePrimary Failed ! ErrorCode: 0x%0x\n\n",rval);
         return -2;
     }
-    printf("\nCreatePrimary Succeed ! Handle: 0x%8.8x\n\n",handle2048rsa);
+    printf("\nCreatePrimary Succeed ! Handle: 0x%8.8x\n\n",primaryHandle);
 
 	return 0;
 }
@@ -252,7 +253,12 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
         }
     }
 
-    rval = Tss2_Sys_Load(sysContext, itemHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
+	//Use the handle we just created from CreatePrimary
+	//Otherwise, use the provided handle
+	if(A_flag)
+    	rval = Tss2_Sys_Load(sysContext, primaryHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
+	else
+	    rval = Tss2_Sys_Load(sysContext, itemHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nLoad Object Failed ! ErrorCode: 0x%0x\n\n",rval);
@@ -567,7 +573,7 @@ int main(int argc, char* argv[])
         prepareTest(hostName, port, debugLevel);
 		
         if(c_flag && checkOutFile(contextItemFile))
-            returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
+            returnVal = loadTpmContextFromFile(sysContext, itemHandle, contextItemFile );
         if (returnVal == 0)
             returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
         if (returnVal == 0 && C_flag)
