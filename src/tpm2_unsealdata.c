@@ -203,6 +203,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
 	TPM2B_DIGEST policyDigest; //unused for now here but BuildPolicyExternal needs to return the policy for sealdata.
+	TPM2B_PUBLIC tempPublic;
 
     TPM2B_NAME nameExt = { { sizeof(TPM2B_NAME)-2, } };
 
@@ -216,7 +217,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 	//Create the parent context
 	if(A_flag)
 	{
-		rval = CreatePrimary(hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
+		rval = CreatePrimary(hierarchy, &tempPublic, TPM_ALG_RSA, nameAlg, P_flag); 
 		if(rval != TPM_RC_SUCCESS)
 		{
 			printf("CreatePrimary failed, errorcode: 0x%x\n", rval);
