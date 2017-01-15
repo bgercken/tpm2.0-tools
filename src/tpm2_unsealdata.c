@@ -192,40 +192,15 @@ TPM_RC CreatePrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_A
 }
 
 
-UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
-				UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
+UINT32 Load(TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, int A_flag, int P_flag) 
 {
-    UINT32 rval;
-	SESSION *policySession;
     TPMS_AUTH_RESPONSE sessionDataOut;
     TSS2_SYS_CMD_AUTHS sessionsData;
     TSS2_SYS_RSP_AUTHS sessionsDataOut;
     TPMS_AUTH_COMMAND *sessionDataArray[1];
     TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
-	TPM2B_DIGEST policyDigest; //unused for now here but BuildPolicyExternal needs to return the policy for sealdata.
-	TPM2B_PUBLIC tempPublic;
 
     TPM2B_NAME nameExt = { { sizeof(TPM2B_NAME)-2, } };
-
-	rval = BuildPolicyExternal(sysContext, &policySession, false, pcrList, pcrCount, &policyDigest, nameAlg);  //Build real policy, don't write to file
-	if(rval != TPM_RC_SUCCESS)
-	{
-		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
-		return rval;
-	}
-
-	//Create the parent context
-	if(A_flag)
-	{
-		rval = CreatePrimary(hierarchy, &tempPublic, TPM_ALG_RSA, nameAlg, P_flag); 
-		if(rval != TPM_RC_SUCCESS)
-		{
-			printf("CreatePrimary failed, errorcode: 0x%x\n", rval);
-			return rval;
-		}
-	}
-
-    TPM2B_SENSITIVE_DATA outData = {{sizeof(TPM2B_SENSITIVE_DATA)-2, }};
 
     sessionDataArray[0] = &sessionData;
     sessionDataOutArray[0] = &sessionDataOut;
@@ -265,6 +240,47 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
         printf("\nLoad Object Failed ! ErrorCode: 0x%0x\n\n",rval);
         return -1;
     }
+
+	return 0;
+
+}
+
+UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
+				UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
+{
+    UINT32 rval;
+	SESSION *policySession;
+	TPM2B_DIGEST policyDigest; //unused for now here but BuildPolicyExternal needs to return the policy for sealdata.
+	TPM2B_PUBLIC tempPublic;
+    TPM2B_SENSITIVE_DATA outData = {{sizeof(TPM2B_SENSITIVE_DATA)-2, }};
+
+    TPM2B_NAME nameExt = { { sizeof(TPM2B_NAME)-2, } };
+
+	rval = BuildPolicyExternal(sysContext, &policySession, false, pcrList, pcrCount, &policyDigest, nameAlg);  //Build real policy, don't write to file
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("BuildPolicy failed, errorcode: 0x%x\n", rval);
+		return rval;
+	}
+
+	//Create the parent context
+	if(A_flag)
+	{
+		rval = CreatePrimary(hierarchy, &tempPublic, TPM_ALG_RSA, nameAlg, P_flag); 
+		if(rval != TPM_RC_SUCCESS)
+		{
+			printf("CreatePrimary failed, errorcode: 0x%x\n", rval);
+			return rval;
+		}
+	}
+
+
+	rval = Load(itemHandle, inPublic, inPrivate, A_flag, P_flag)
+	if(rval != TPM_RC_SUCCESS)
+	{
+		printf("Load failed, errorcode: 0x%x\n", rval);
+		return rval;
+	}
 
     sessionData.sessionHandle = policySession->sessionHandle;
     rval = Tss2_Sys_Unseal(sysContext, handle2048rsa, &sessionsData, &outData, &sessionsDataOut);
