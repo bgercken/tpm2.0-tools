@@ -608,7 +608,7 @@ int main(int argc, char* argv[])
     {
         prepareTest(hostName, port, debugLevel);
 		
-        if(c_flag && checkOutFile(contextItemFile))
+        if(c_flag && (checkOutFile(contextItemFile) == -1))
             returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
             returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
