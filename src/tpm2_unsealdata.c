@@ -365,7 +365,7 @@ int main(int argc, char* argv[])
     int port = DEFAULT_RESMGR_TPM_PORT;
 	
 	TPMI_ALG_HASH nameAlg;
-    TPMI_DH_OBJECT itemHandle, parentHandle;
+    TPMI_DH_OBJECT itemHandle;
     TPM2B_PUBLIC  inPublic;
     TPM2B_PRIVATE inPrivate;
     char outFilePath[PATH_MAX] = {0};
@@ -590,7 +590,7 @@ int main(int argc, char* argv[])
         prepareTest(hostName, port, debugLevel);
 		
         if(c_flag && checkOutFile(contextItemFile))
-            returnVal = loadTpmContextFromFile(sysContext, itemHandle, contextItemFile );
+            returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
             returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
         if (returnVal == 0 && C_flag)
