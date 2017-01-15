@@ -262,7 +262,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 	}
 
 	//Create the parent context
-	if(A_flag)
+	/*if(A_flag)
 	{
 		rval = CreatePrimary(hierarchy, &tempPublic, TPM_ALG_RSA, nameAlg, P_flag); 
 		if(rval != TPM_RC_SUCCESS)
@@ -271,7 +271,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 			return rval;
 		}
 	}
-
+	*/
 
 	rval = Load(itemHandle, inPublic, inPrivate, A_flag, P_flag);
 	if(rval != TPM_RC_SUCCESS)
@@ -608,7 +608,8 @@ int main(int argc, char* argv[])
     {
         prepareTest(hostName, port, debugLevel);
 		
-        if(c_flag && (checkOutFile(contextItemFile) == -1))
+        //if(c_flag && (checkOutFile(contextItemFile) == -1))
+        if(c_flag)
             returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
         if (returnVal == 0)
             returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
