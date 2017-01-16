@@ -246,20 +246,21 @@ int main(int argc, char *argv[])
             }
             break;
 		case 's':
-			safeStrNCpy(strHash, optarg, sizeof(strHash));
-			ret = verifyHash(strHash);
-			if ( ret != 0 )
-			{
-				printf("Input digest is not in valid hexadecimal format.\n");
-				returnVal = -5;
-				break;
-			}
-			if ( hex2ByteStructure(strHash, &byteLength, byteHash) != 0)
+			//safeStrNCpy(strHash, optarg, sizeof(strHash));
+			//ret = verifyHash(strHash);
+			//if ( ret != 0 )
+			//{
+			//	printf("Input digest is not in valid hexadecimal format.\n");
+			//	returnVal = -5;
+			//	break;
+			//}
+			memcpy(byteHash, optarg, sizeof(byteHash));
+			/*if ( hex2ByteStructure(strHash, &byteLength, byteHash) != 0)
 			{
 				printf("Failed to convert string representation of hash to byte array");
 				returnVal = -6;
 				break;
-			} 
+			}*/ 
 			break;
 		case 'c':
 			if ( getPcrId(optarg, &pcr) )
