@@ -309,24 +309,26 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
         return -1;
     }
 
-    printf("\nUnseal succ.\nUnsealed data: ");
+    printf("\nUnseal succ.\n");
+	/*
     for(UINT16 i = 0; i < outData.t.size; i++)
         printf(" 0x%02x", outData.t.buffer[i]);
     printf("\n");
-
+	*/
     if(saveDataToFile(outFileName, (UINT8 *)outData.t.buffer, outData.t.size))
     {
         printf("Failed to save unsealed data into %s\n", outFileName);
         return -2;
     }
 
+	/*
 	//Now clean up our session
 	rval = Tss2_Sys_FlushContext( sysContext, policySession->sessionHandle );	
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("FlushContext failed: Error Code: -x%x\n", rval);
 		return -3;
-	}
+	}*/
 
 	rval = EndAuthSession( policySession );
 	if(rval != TPM_RC_SUCCESS)
