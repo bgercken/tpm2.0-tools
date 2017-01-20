@@ -97,8 +97,13 @@ sbin_PROGRAMS += \
 		  src/tpm2_rsadecrypt \
 		  src/tpm2_rsaencrypt \
 		  src/tpm2_sign \
-		  src/tpm2_unseal
-
+		  src/tpm2_unseal \
+		  src/tpm2_verifysignature \
+		  src/tpm2_extendpcr \
+		  src/tpm2_sealdata \
+		  src/tpm2_isowned \
+		  src/tpm2_unsealdata
+ 
 COMMON_SRC += \
     src/common.c \
     src/syscontext.c \
@@ -196,6 +201,10 @@ src_tpm2_getpubak_SOURCES = src/tpm2_getpubak.c src/main.c
 
 # rc_decode does not use common main, since it does not need a dynamic TCTI.
 src_tpm2_rc_decode_SOURCES = src/rc-decode.c src/tpm2_rc_decode.c
+src_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.cpp
+src_tpm2_sealdata_SOURCES = src/tpm2_sealdata.c
+src_tpm2_isowned_SOURCES = src/tpm2_isowned.c
+src_tpm2_unsealdata_SOURCES = src/tpm2_unsealdata.c
 
 if UNIT
 test_unit_tpm2_rc_decode_unit_CFLAGS  = $(AM_CFLAGS) $(CMOCKA_CFLAGS)
