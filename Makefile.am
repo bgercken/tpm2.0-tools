@@ -69,7 +69,8 @@ COMMON_SRC = \
     src/password_util.c \
     src/tpm_kdfa.c \
     src/tpm_hmac.c \
-    src/tpm_session.c
+    src/tpm_session.c \
+    src/buildPolicy.c 
 
 # The tools within this conditional are hard coded to the socket TCTI.
 # As they're migrated to support dynamic TCTI configuration they should be
@@ -101,7 +102,6 @@ sbin_PROGRAMS += \
 		  src/tpm2_verifysignature \
 		  src/tpm2_extendpcr \
 		  src/tpm2_sealdata \
-		  src/tpm2_isowned \
 		  src/tpm2_unsealdata
  
 COMMON_SRC += \
@@ -201,10 +201,10 @@ src_tpm2_getpubak_SOURCES = src/tpm2_getpubak.c src/main.c
 
 # rc_decode does not use common main, since it does not need a dynamic TCTI.
 src_tpm2_rc_decode_SOURCES = src/rc-decode.c src/tpm2_rc_decode.c
-src_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.cpp
-src_tpm2_sealdata_SOURCES = src/tpm2_sealdata.c
-src_tpm2_isowned_SOURCES = src/tpm2_isowned.c
-src_tpm2_unsealdata_SOURCES = src/tpm2_unsealdata.c
+src_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.c src/main.c
+src_tpm2_sealdata_SOURCES = src/tpm2_sealdata.c src/main.c
+#src_tpm2_isowned_SOURCES = src/tpm2_isowned.c
+src_tpm2_unsealdata_SOURCES = src/tpm2_unsealdata.c src/main.c
 
 if UNIT
 test_unit_tpm2_rc_decode_unit_CFLAGS  = $(AM_CFLAGS) $(CMOCKA_CFLAGS)

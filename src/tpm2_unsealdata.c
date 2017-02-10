@@ -43,11 +43,13 @@
 #include "sample.h"
 #include <tcti/tcti_socket.h>
 #include "common.h"
+#include "pcr.h"
 
 TPMS_AUTH_COMMAND sessionData;
 int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 TPM_HANDLE primaryHandle;
+int debugLevel = 0;
 
 int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
 {
@@ -246,7 +248,7 @@ UINT32 load(TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *in
 }
 
 UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
-				UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
+				pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
 {
     UINT32 rval;
 	SESSION *policySession;
@@ -356,7 +358,8 @@ execute_tool(int 			  argc,
 	UINT16 size;
 	UINT32 pcr = -1;
 	UINT32 pcrCount = 0;
-	UINT32 pcrList[24];
+	pcr_struct * pcrList[24];
+	BYTE forwardHash[32] = {0};
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
@@ -432,7 +435,7 @@ execute_tool(int 			  argc,
             P_flag = 1;
             break;
         case 'o':
-            safeStrNCpy(outFilePath, optarg, sizeof(outFilePath));
+            snprintf(outFilePath, sizeof(outFilePath), "%s", optarg);
             if(checkOutFile(outFilePath) != 0)
             {
                 returnVal = -4;
@@ -505,13 +508,18 @@ execute_tool(int 			  argc,
             g_flag = 1;
             break;
 		case 'r':
-			if ( getPcrId(optarg, &pcr) )
+			if ( pcr_parse_arg(optarg, &pcr, &forwardHash) )
 			{
 				printf("Invalid pcr value.\n");
-				returnVal = -12;
+				returnVal = -10;
+				break;
 			}
 			r_flag = 1;
-			pcrList[pcrCount] = pcr;
+			pcr_struct *new_pcr = (pcr_struct *) malloc(sizeof(pcr_struct));
+			new_pcr->pcr = pcr;
+			memcpy(new_pcr->forwardHash, forwardHash, 32);
+			memset(forwardHash, 0, 32);
+			pcrList[pcrCount] = new_pcr;
 			pcrCount++;
 			break;
         case 'X':
@@ -551,6 +559,10 @@ execute_tool(int 			  argc,
             returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
         if (returnVal == 0 && C_flag)
 			returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextLoadFile); 
+
+		//clean up pcr objects
+		for(int i = 0; i < pcrCount; i++)
+			free(pcrList[i]);
 
         if(returnVal)
             return -15;

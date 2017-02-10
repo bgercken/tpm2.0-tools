@@ -13,10 +13,12 @@
 #include "sample.h"
 #include <tcti/tcti_socket.h>
 #include "common.h"
+#include "pcr.h"
 
 TPMS_AUTH_COMMAND sessionData;
 TPM_HANDLE handle2048rsa;
 bool hexPasswd = false;
+int debugLevel = 0;
 
 int setAlgCreate(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, int I_flag)
 {
@@ -354,7 +356,7 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
 
 //TODO: Might need to include inSensitive for CreatePrimary...maybe
 int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
-			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, UINT32 *pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
+			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
 {
 
 	//Create trial policy if pcr specified
@@ -397,7 +399,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 int 
 execute_tool(int 				argc, 
 			 char* 				argv[],
-			 char* 				envp[]
+			 char* 				envp[],
 			 common_opts_t    	*opts,
              TSS2_SYS_CONTEXT 	*sapi_context)
 {
@@ -417,7 +419,8 @@ execute_tool(int 				argc,
 
 	UINT32 pcr = -1;
 	UINT32 pcrCount = 0;
-	UINT32 pcrList[24];
+	pcr_struct* pcrList[24];
+	BYTE forwardHash[32] = {0};
 
     setbuf(stdout, NULL);
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
@@ -517,7 +520,7 @@ execute_tool(int 				argc,
             printf("inSensitive.t.sensitive.data.t.size = %d\n",inSensitive.t.sensitive.data.t.size);
             break;
         case 'o':
-            safeStrNCpy(opuFilePath, optarg, sizeof(opuFilePath));
+            snprintf(opuFilePath, sizeof(opuFilePath), "%s", optarg);
             if(checkOutFile(opuFilePath) != 0)
             {
                 returnVal = -7;
@@ -526,7 +529,7 @@ execute_tool(int 				argc,
             o_flag = 1;
             break;
         case 'O':
-            safeStrNCpy(oprFilePath, optarg, sizeof(oprFilePath));
+            snprintf(oprFilePath, sizeof(oprFilePath), "%s", optarg);
             if(checkOutFile(oprFilePath) != 0)
             {
                 returnVal = -8;
@@ -535,7 +538,7 @@ execute_tool(int 				argc,
             O_flag = 1;
             break;
         case 'n':
-            safeStrNCpy(contextFilePath, optarg, sizeof(contextFilePath));
+            snprintf(contextFilePath, sizeof(contextFilePath), "%s", optarg);
             if(checkOutFile(contextFilePath) != 0)
             {
                 returnVal = -9;
@@ -544,13 +547,18 @@ execute_tool(int 				argc,
             n_flag = 1;
             break;
         case 'r':
-			if ( getPcrId(optarg, &pcr) )
+			if ( pcr_parse_arg(optarg, &pcr, &forwardHash) )
 			{
 				printf("Invalid pcr value.\n");
 				returnVal = -10;
+				break;
 			}
 			r_flag = 1;
-			pcrList[pcrCount] = pcr;
+			pcr_struct *new_pcr = (pcr_struct *) malloc(sizeof(pcr_struct));
+			new_pcr->pcr = pcr;
+			memcpy(new_pcr->forwardHash, forwardHash, 32);
+			memset(forwardHash, 0, 32);
+			pcrList[pcrCount] = new_pcr;
 			pcrCount++;
 			break;
         case 'X':
@@ -561,6 +569,7 @@ execute_tool(int 				argc,
             {
                 printf("Incorrect port number.\n");
                 returnVal = -11;
+				break;
             }
             break;
         case 'd':
@@ -568,6 +577,7 @@ execute_tool(int 				argc,
             {
                 printf("Incorrect debug level.\n");
                 returnVal = -12;
+				break;
             }
             break;
 		case 'A':
@@ -623,6 +633,10 @@ execute_tool(int 				argc,
 
         if(returnVal)
             return -17;
+
+		//clean up pcr objects
+		for(int i = 0; i < pcrCount; i++)
+			free(pcrList[i]);
     }
     else
     {

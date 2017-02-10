@@ -12,7 +12,7 @@ UINT32 tpm_hash(TSS2_SYS_CONTEXT *sapi_context, TPMI_ALG_HASH hashAlg,
             TPM_RH_NULL, result, 0, 0);
 }
 
-static TPM_RC hash_sequence_ex(TSS2_SYS_CONTEXT *sapi_context,
+TPM_RC hash_sequence_ex(TSS2_SYS_CONTEXT *sapi_context,
 
     TPMI_ALG_HASH hashAlg, UINT32 numBuffers, TPM2B_MAX_BUFFER *bufferList,
     TPM2B_DIGEST *result) {
@@ -42,6 +42,7 @@ static TPM_RC hash_sequence_ex(TSS2_SYS_CONTEXT *sapi_context,
     rval = Tss2_Sys_HashSequenceStart(sapi_context, 0, &nullAuth, hashAlg,
             &sequenceHandle, 0);
     if (rval != TPM_RC_SUCCESS) {
+		printf("HashSequenceStart failed, rc=%x\n", rval);
         return rval;
     }
 
@@ -50,15 +51,18 @@ static TPM_RC hash_sequence_ex(TSS2_SYS_CONTEXT *sapi_context,
                 &cmdAuthArray, &bufferList[i], 0);
 
         if (rval != TPM_RC_SUCCESS) {
+			printf("SequenceUpdate failed, i=%d rc=%x\n", i, rval);
             return rval;
         }
     }
 
+    result->t.size = sizeof( *result ) - 2;
     rval = Tss2_Sys_SequenceComplete(sapi_context, sequenceHandle,
             &cmdAuthArray, (TPM2B_MAX_BUFFER *) &emptyBuffer,
             TPM_RH_PLATFORM, result, &validation, 0);
 
     if (rval != TPM_RC_SUCCESS) {
+		printf("SequenceComplete failed, rc=%x\n", rval);
         return rval;
     }
 

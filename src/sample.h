@@ -143,6 +143,12 @@ typedef struct{
     UINT8 nvNameChanged;
 } ENTITY;
 
+
+typedef struct pcr_struct {
+	UINT32 pcr;
+	BYTE forwardHash[32];
+} pcr_struct;
+
 void InitEntities();
 TPM_RC AddEntity( TPM_HANDLE entityHandle, TPM2B_AUTH *auth );
 TPM_RC DeleteEntity( TPM_HANDLE entityHandle );
@@ -327,7 +333,7 @@ void CloseOutFile( FILE **outFp );
 
 UINT16 GetDigestSize( TPM_ALG_ID authHash );
 
-TPM_RC BuildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial, UINT32 *pcrList, UINT32 pcrCount, TPM2B_DIGEST *policyDigest, TPMI_ALG_HASH nameAlg);
+int buildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, int trial, pcr_struct **pcrList, UINT32 pcrCount, TPM2B_DIGEST *policyDigest, TPMI_ALG_HASH nameAlg);
 
 TPM_RC ConcatSizedByteBuffer( TPM2B_MAX_BUFFER *result, TPM2B *addBuffer );
 

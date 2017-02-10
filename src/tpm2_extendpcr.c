@@ -42,6 +42,7 @@
 #include <tcti/tcti_socket.h>
 #include "common.h"
 #include "sample.h"
+#include "pcr.h"
 
 #define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \
     (pcrSelection).pcrSelect[( (pcr)/8 )] |= ( 1 << ( (pcr) % 8) );
@@ -186,8 +187,13 @@ const char *findChar(const char *str, int len, char c)
    functionality to accept files/streams of data, compute the digest of that
    data, and then extend the pcr.
  */
-int main(int argc, char *argv[])
+execute_tool(int 				argc, 
+			 char* 				argv[],
+			 char* 				envp[],
+			 common_opts_t    	*opts,
+             TSS2_SYS_CONTEXT 	*sapi_context)
 {
+	sysContext = sapi_context;	
 	BYTE byteHash[SHA512_DIGEST_SIZE];
 	UINT16 byteLength;
 	char strHash[SHA512_DIGEST_SIZE*2] = {0};			//SHA512_DIGEST_SIZE*2 is the largest digest we'd encounter
@@ -265,7 +271,7 @@ int main(int argc, char *argv[])
 			}*/ 
 			break;
 		case 'c':
-			if ( getPcrId(optarg, &pcr) )
+			if ( pcr_get_id(optarg, &pcr) )
 			{
 				printf("Invalid pcr value.\n");
 				returnVal = -7;

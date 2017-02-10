@@ -142,7 +142,7 @@ sapi_ctx_init (TSS2_TCTI_CONTEXT *tcti_ctx)
         .tssVersion = TSS_SAPI_FIRST_VERSION,
     };
 
-    size = Tss2_Sys_GetContextSize (0);
+    size = Tss2_Sys_GetContextSize (12000);
     sapi_ctx = (TSS2_SYS_CONTEXT*)calloc (1, size);
     if (sapi_ctx == NULL) {
         fprintf (stderr,

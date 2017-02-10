@@ -5,5 +5,6 @@
 
 UINT32 tpm_hash(TSS2_SYS_CONTEXT *sapi_context, TPMI_ALG_HASH hashAlg, UINT16 size, BYTE *data, TPM2B_DIGEST *result);
 int tpm_hash_compute_data(TSS2_SYS_CONTEXT *sapi_context, BYTE *buffer, UINT16 length, TPMI_ALG_HASH halg, TPM2B_DIGEST *result);
+TPM_RC hash_sequence_ex(TSS2_SYS_CONTEXT *sapi_context, TPMI_ALG_HASH hashAlg, UINT32 numBuffers, TPM2B_MAX_BUFFER *bufferList, TPM2B_DIGEST *result);
 
 #endif /* SRC_TPM_HASH_H_ */
