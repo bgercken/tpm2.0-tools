@@ -187,7 +187,6 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
         printf("\nCreatePrimary Failed ! ErrorCode: 0x%0x\n\n",rval);
         return -2;
     }
-    printf("\nCreatePrimary Succeed ! Handle: 0x%8.8x\n\n",primaryHandle);
 
 	return 0;
 }
@@ -310,12 +309,14 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
         return -1;
     }
 
-    printf("\nUnseal succ.\n");
-    if(saveDataToFile(outFileName, (UINT8 *)outData.t.buffer, outData.t.size))
+	//Write data directly to stdout, to be consumed by the caller
+	fwrite(outData.t.buffer, 1, outData.t.size, stdout);
+
+    /*if(saveDataToFile(outFileName, (UINT8 *)outData.t.buffer, outData.t.size))
     {
         printf("Failed to save unsealed data into %s\n", outFileName);
         return -2;
-    }
+    }*/
 
 	/*
 	//Now clean up our session
@@ -422,7 +423,6 @@ execute_tool(int 			  argc,
                 returnVal = -2;
                 break;
             }
-            printf("\nitemHandle: 0x%x\n\n",itemHandle);
             H_flag = 1;
             break;
         case 'P':
@@ -464,7 +464,6 @@ execute_tool(int 			  argc,
                 returnVal = -7;
                 break;
             }
-            printf("contextItemFile = %s\n", contextItemFile);
             c_flag = 1;
             break;
         case 'C':
@@ -474,12 +473,10 @@ execute_tool(int 			  argc,
                 returnVal = -8;
                 break;
             }
-            printf("contextLoadFile = %s\n", contextLoadFile);
             C_flag = 1;
 			break;
         case 'u':
             size = sizeof(inPublic);
-			printf("inPublic: %s\n", optarg);
             if(loadDataFromFile(optarg, (UINT8 *)&inPublic, &size) != 0)
             {
                 returnVal = -9;
@@ -489,7 +486,6 @@ execute_tool(int 			  argc,
             break;
         case 'n':
             size = sizeof(inPrivate);
-			printf("inPrivate: %s\n", optarg);
             if(loadDataFromFile(optarg, (UINT8 *)&inPrivate, &size) != 0)
             {
                 returnVal = -10;
@@ -504,7 +500,6 @@ execute_tool(int 			  argc,
                 returnVal = -11;
                 break;
             }
-            printf("nameAlg = 0x%4.4x\n", nameAlg);
             g_flag = 1;
             break;
 		case 'r':
@@ -543,13 +538,13 @@ execute_tool(int 			  argc,
     if(returnVal != 0)
         return returnVal;
 
-    flagCnt = H_flag + o_flag + c_flag + n_flag + u_flag + g_flag + r_flag;
+    flagCnt = H_flag + c_flag + n_flag + u_flag + g_flag + r_flag;
     if(flagCnt == 1)
     {
 		showArgMismatch(argv[0]);
 		return -14;
     }
-    else if(flagCnt >= 5 && (H_flag == 1 || c_flag ==1 || A_flag == 1) && o_flag == 1 && n_flag == 1 && u_flag == 1 && r_flag == 1)
+    else if(flagCnt >= 4 && (H_flag == 1 || c_flag ==1 || A_flag == 1) && n_flag == 1 && u_flag == 1 && r_flag == 1)
     {
 		
         //if(c_flag && (checkOutFile(contextItemFile) == -1))
