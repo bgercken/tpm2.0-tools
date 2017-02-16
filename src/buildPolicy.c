@@ -44,7 +44,6 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 	//Init the pcr selection we will use for the PCRPolicy call
 	for(int i = 0; i < pcrCountIn; i++)
 	{
-		printf("pcrid: %d\n", pcrList[i]->pcr);
 		SET_PCR_SELECT_BIT( pcrs.pcrSelections[0], pcrList[i]->pcr );
 	}
 
@@ -59,26 +58,17 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 			//forwardHash is empty, set the pcr select bit to get the value from the tpm
 			if(!strcmp(pcrList[i]->forwardHash, ""))
 			{
-				printf("Setting pcrid: %d, i=%d, j=%d\n", pcrList[i]->pcr, i, j);
 				SET_PCR_SELECT_BIT(pcrsTmp.pcrSelections[0], pcrList[i]->pcr);
 				pcrReadIndex++; //inc number of pcrs we actually intend to read.
 			} else {
 				j--; //don't increment our batch counter if there's a forwardHash to process
 			}
 		}
-		printf("before PCR read\n");
 
 		memset(&tmpPcrValues, 0, sizeof(TPML_DIGEST));
 		rval = Tss2_Sys_PCR_Read( sysContext, 0, &pcrsTmp, &pcrUpdateCounter, &pcrSelectionOut, &tmpPcrValues, 0 );
 		if( rval != TPM_RC_SUCCESS )
 			return rval;
-
-		printf("after PCR read\n");
-		for(int j = 0; j < tmpPcrValues.count; j++) {
-			for (int k = 0; k < tmpPcrValues.digests[j].t.size; k++)
-				printf(" %02x", tmpPcrValues.digests[j].t.buffer[k]);
-			printf("\n");
-		}
 
 		//populate the hashes into our list of hashes
 		for(int i = 0; i < tmpPcrValues.count; i++)
@@ -111,16 +101,10 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 	if( rval != TPM_RC_SUCCESS )
 		return rval;
 
-	printf("past hash sequence\n");
-
-	printf("pcrDigest = ");
-	string_bytes_print_tpm2b(&pcrDigest);
-
 	rval = Tss2_Sys_PolicyPCR( sysContext, policySession->sessionHandle, 0, &pcrDigest, &pcrs, 0 );
 	if( rval != TPM_RC_SUCCESS )
 		return rval;
 
-	printf("past policyPcr sequence\n");
    return rval;
 }
 
