@@ -406,6 +406,8 @@ execute_tool(int 				argc,
 	sysContext = sapi_context;	
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
+	char pass[40];
+	char *index = NULL;
 
     TPM2B_SENSITIVE_CREATE  inSensitive;
     inSensitive.t.sensitive.data.t.size = 0;
@@ -426,7 +428,7 @@ execute_tool(int 				argc,
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "H:P:K:g:G:A:I:L:o:O:c:b:r:n:X";
+    const char *optstring = "H:PK:g:G:A:I:L:o:O:c:b:r:n:X";
     static struct option long_options[] = {
       {"pwdp",1,NULL,'P'},
       {"pwdk",1,NULL,'K'},
@@ -463,8 +465,12 @@ execute_tool(int 				argc,
         switch(opt)
         {
         case 'P':
+			fgets(pass, 40, stdin);
+			index = strchr(pass, '\n');
+			if (index)
+				*index = '\0';
             sessionData.hmac.t.size = sizeof(sessionData.hmac.t) - 2;
-            if(str2ByteStructure(optarg,&sessionData.hmac.t.size,sessionData.hmac.t.buffer) != 0)
+            if(str2ByteStructure(pass,&sessionData.hmac.t.size,sessionData.hmac.t.buffer) != 0)
             {
                 returnVal = -1;
                 break;
