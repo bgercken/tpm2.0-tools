@@ -12,7 +12,7 @@ int loadDataFromFile(const char *fileName, UINT8 *buf, UINT16 *size)
     if ( size == NULL || buf == NULL || fileName == NULL )
         return -1;
 
-    f = fopen(fileName, "rb+");
+    f = fopen(fileName, "rb");
     if( f == NULL )
     {
         printf("File(%s) open error.\n", fileName);
