@@ -93,7 +93,8 @@ lib_libcommon_a_SOURCES = \
     lib/tpm_hash.c \
     lib/tpm_hmac.c \
     lib/tpm_kdfa.c \
-    lib/tpm_session.c
+    lib/tpm_session.c \
+	lib/buildPolicy.c
 
 tools_tpm2_create_SOURCES = tools/tpm2_create.c tools/main.c
 tools_tpm2_createprimary_SOURCES = tools/tpm2_createprimary.c tools/main.c
@@ -135,10 +136,10 @@ tools_tpm2_unseal_SOURCES = tools/tpm2_unseal.c tools/main.c
 
 # rc_decode does not use common main, since it does not need a dynamic TCTI.
 tools_tpm2_rc_decode_SOURCES = lib/rc-decode.c tools/tpm2_rc_decode.c
-tools_tpm2_extendpcr_SOURCES = src/tpm2_extendpcr.cpp
-tools_tpm2_sealdata_SOURCES = src/tpm2_sealdata.c
-tools_tpm2_isowned_SOURCES = src/tpm2_isowned.c
-tools_tpm2_unsealdata_SOURCES = src/tpm2_unsealdata.c
+tools_tpm2_extendpcr_SOURCES = tools/tpm2_extendpcr.c
+tools_tpm2_sealdata_SOURCES = tools/tpm2_sealdata.c
+tools_tpm2_isowned_SOURCES = tools/tpm2_isowned.c
+tools_tpm2_unsealdata_SOURCES = tools/tpm2_unsealdata.c
 
 if UNIT
 TESTS = $(check_PROGRAMS)

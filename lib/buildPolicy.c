@@ -1,8 +1,6 @@
 
 #include <sapi/tpm20.h>
-#include "sample.h"
 #include <tcti/tcti_socket.h>
-#include "common.h"
 #include "tpm_session.h"
 #include "tpm_hash.h"
 #include "string-bytes.h"

@@ -40,8 +40,6 @@
 
 #include <sapi/tpm20.h>
 #include <tcti/tcti_socket.h>
-#include "common.h"
-#include "sample.h"
 #include "pcr.h"
 
 #define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \

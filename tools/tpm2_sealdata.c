@@ -10,7 +10,6 @@
 #include <stdbool.h>
 
 #include <sapi/tpm20.h>
-#include "sample.h"
 #include <tcti/tcti_socket.h>
 #include "pcr.h"
 
