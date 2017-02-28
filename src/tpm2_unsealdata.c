@@ -42,7 +42,6 @@
 #include <sapi/tpm20.h>
 #include "sample.h"
 #include <tcti/tcti_socket.h>
-#include "common.h"
 #include "pcr.h"
 
 TPMS_AUTH_COMMAND sessionData;
@@ -123,7 +122,7 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
     return 0;
 }
 
-int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
+int createPrimary(TSS2_SYS_CONTEXT *sapi_context, TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
 {
 	TPM_RC rval;
 	TPMS_AUTH_RESPONSE sessionDataOut;
@@ -181,7 +180,7 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
 
     creationPCR.count = 0;
 
-    rval = Tss2_Sys_CreatePrimary(sysContext, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &primaryHandle, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
+    rval = Tss2_Sys_CreatePrimary(sapi_context, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &primaryHandle, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nCreatePrimary Failed ! ErrorCode: 0x%0x\n\n",rval);
@@ -192,7 +191,7 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
 }
 
 
-UINT32 load(TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, int A_flag, int P_flag) 
+UINT32 load(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, int A_flag, int P_flag) 
 {
     UINT32 rval;
     TPMS_AUTH_RESPONSE sessionDataOut;
@@ -233,9 +232,9 @@ UINT32 load(TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *in
 	//Use the handle we just created from CreatePrimary
 	//Otherwise, use the provided handle
 	if(A_flag)
-    	rval = Tss2_Sys_Load(sysContext, primaryHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
+    	rval = Tss2_Sys_Load(sapi_context, primaryHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
 	else
-	    rval = Tss2_Sys_Load(sysContext, itemHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
+	    rval = Tss2_Sys_Load(sapi_context, itemHandle, &sessionsData, inPrivate , inPublic, &handle2048rsa, &nameExt, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nLoad Object Failed ! ErrorCode: 0x%0x\n\n",rval);
@@ -246,7 +245,7 @@ UINT32 load(TPMI_DH_OBJECT itemHandle, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *in
 
 }
 
-UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
+UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg, 
 				pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy, int A_flag)
 {
     UINT32 rval;
@@ -254,7 +253,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 	TPM2B_DIGEST policyDigest; //unused for now here but buildPolicyExternal needs to return the policy for sealdata.
 	TPM2B_PUBLIC tempPublic;
 
-	rval = buildPolicyExternal(sysContext, &policySession, false, pcrList, pcrCount, &policyDigest, nameAlg);  //Build real policy, don't write to file
+	rval = buildPolicyExternal(sapi_context, &policySession, false, pcrList, pcrCount, &policyDigest, nameAlg);  //Build real policy, don't write to file
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("buildPolicy() failed, ec: 0x%x\n", rval);
@@ -302,7 +301,7 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
     *((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
 
     sessionData.sessionHandle = policySession->sessionHandle;
-    rval = Tss2_Sys_Unseal(sysContext, handle2048rsa, &sessionsData, &outData, &sessionsDataOut);
+    rval = Tss2_Sys_Unseal(sapi_context, handle2048rsa, &sessionsData, &outData, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("unseal() failed. ec: 0x%x\n", rval);
@@ -327,10 +326,10 @@ UINT32 unseal(TPMI_DH_OBJECT itemHandle, const char *outFileName, int P_flag, TP
 		return -3;
 	}*/
 
-	rval = EndAuthSession( policySession );
+	rval = tpm2_session_auth_end(policySession);
 	if(rval != TPM_RC_SUCCESS)
 	{
-		printf("EndAuthSession failed: ec: 0x%x\n", rval);
+		printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
 		return -4;
 	}
 
@@ -344,7 +343,6 @@ execute_tool(int 			  argc,
              common_opts_t    *opts,
              TSS2_SYS_CONTEXT *sapi_context)
 {
-	sysContext = sapi_context;
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 	
@@ -443,20 +441,6 @@ execute_tool(int 			  argc,
             }
             o_flag = 1;
             break;
-        case 'p':
-            if( getPort(optarg, &port) )
-            {
-                printf("Incorrect port number.\n");
-                returnVal = -5;
-            }
-            break;
-        case 'd':
-            if( getDebugLevel(optarg, &debugLevel) )
-            {
-                printf("Incorrect debug level.\n");
-                returnVal = -6;
-            }
-            break;
         case 'c':
             contextItemFile = optarg;
             if(contextItemFile == NULL || contextItemFile[0] == '\0')
@@ -549,11 +533,11 @@ execute_tool(int 			  argc,
 		
         //if(c_flag && (checkOutFile(contextItemFile) == -1))
         if(c_flag)
-            returnVal = loadTpmContextFromFile(sysContext, &itemHandle, contextItemFile );
+            returnVal = loadTpmContextFromFile(sapi_context, &itemHandle, contextItemFile );
         if (returnVal == 0)
-            returnVal = unseal(itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
+            returnVal = unseal(sapi_context, itemHandle, outFilePath, P_flag, &inPublic, &inPrivate, nameAlg, pcrList, pcrCount, hierarchy, A_flag);
         if (returnVal == 0 && C_flag)
-			returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextLoadFile); 
+			returnVal = saveTpmContextToFile(sapi_context, handle2048rsa, contextLoadFile); 
 
 		//clean up pcr objects
 		for(int i = 0; i < pcrCount; i++)
