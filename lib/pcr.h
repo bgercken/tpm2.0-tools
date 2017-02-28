@@ -7,4 +7,8 @@ int pcr_parse_selections(const char *arg, TPML_PCR_SELECTION *pcrSels);
 int pcr_parse_list(const char *str, int len, TPMS_PCR_SELECTION *pcrSel);
 int pcr_parse_arg(const char *arg, UINT32 *pcrId, BYTE *forwardHash);
 
+typedef struct pcr_struct {
+	UINT32 pcr;
+	BYTE forwardHash[32];
+} pcr_struct;
 #endif /* SRC_PCR_H_ */

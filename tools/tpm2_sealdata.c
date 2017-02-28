@@ -12,6 +12,10 @@
 #include <sapi/tpm20.h>
 #include <tcti/tcti_socket.h>
 #include "pcr.h"
+#include "options.h"
+#include "log.h"
+#include "tpm_session.h"
+#include "string-bytes.h"
 
 TPMS_AUTH_COMMAND sessionData;
 TPM_HANDLE handle2048rsa;

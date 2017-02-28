@@ -42,6 +42,10 @@
 #include <sapi/tpm20.h>
 #include <tcti/tcti_socket.h>
 #include "pcr.h"
+#include "log.h"
+#include "options.h"
+#include "tpm_session.h"
+#include "string-bytes.h"
 
 TPMS_AUTH_COMMAND sessionData;
 int hexPasswd = false;
@@ -271,7 +275,7 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
 	}
 	*/
 
-	rval = load(itemHandle, inPublic, inPrivate, A_flag, P_flag);
+	rval = load(sapi_context, itemHandle, inPublic, inPrivate, A_flag, P_flag);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("load() failed, ec: 0x%x\n", rval);
@@ -325,7 +329,7 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
 		return -3;
 	}*/
 
-	rval = tpm2_session_auth_end(policySession);
+	rval = tpm_session_auth_end(policySession);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);

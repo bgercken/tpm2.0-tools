@@ -41,6 +41,9 @@
 #include <sapi/tpm20.h>
 #include <tcti/tcti_socket.h>
 #include "pcr.h"
+#include "log.h"
+#include "options.h"
+#include "string-bytes.h"
 
 #define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \
     (pcrSelection).pcrSelect[( (pcr)/8 )] |= ( 1 << ( (pcr) % 8) );
@@ -59,7 +62,7 @@
 int debugLevel = 0;
 char outFilePath[PATH_MAX];
 
-int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
+int doPcrExtendOp(TSS2_SYS_CONTEXT *sapi_context, BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 {
 	TPMS_AUTH_COMMAND sessionData;
 	TSS2_SYS_CMD_AUTHS sessionsData;
@@ -119,9 +122,8 @@ int doPcrExtendOp(BYTE * byteHash, UINT32 pcr, TPMI_ALG_HASH hashAlgIn)
 	sessionsData.cmdAuthsCount = 1;
 	sessionsData.cmdAuths[0] = &sessionData;
 	
-	rval = Tss2_Sys_PCR_Extend( sysContext, pcr, &sessionsData, &digests, 0 );
+	rval = Tss2_Sys_PCR_Extend( sapi_context, pcr, &sessionsData, &digests, 0 );
 	if( rval != TPM_RC_SUCCESS) {
-		ErrorHandler(rval);
 		printf("Failed to extend PCR: %d\n", pcr);
 		return -2;
 	}
@@ -191,7 +193,6 @@ execute_tool(int 				argc,
 			 common_opts_t    	*opts,
              TSS2_SYS_CONTEXT 	*sapi_context)
 {
-	sysContext = sapi_context;	
 	BYTE byteHash[SHA512_DIGEST_SIZE];
 	UINT16 byteLength;
 	char strHash[SHA512_DIGEST_SIZE*2] = {0};			//SHA512_DIGEST_SIZE*2 is the largest digest we'd encounter
@@ -204,15 +205,13 @@ execute_tool(int 				argc,
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "hvg:p:d:s:c:";
+    const char *optstring = "hvg:d:s:c:";
     static struct option long_options[] = {
         {"help",0,NULL,'h'},
 		{"version",0,NULL,'v'},
         {"algorithm",1,NULL,'g'},
         {"hash",1,NULL,'s'},
         {"pcr",1,NULL,'c'},
-        {"port",1,NULL,'p'},
-        {"debugLevel",1,NULL,'d'},
         {0,0,0,0}
     };
 
@@ -234,20 +233,6 @@ execute_tool(int 				argc,
             break;
         case 'v':
             v_flag = 1;
-            break;
-        case 'p':
-            if( getPort(optarg, &port) )
-            {
-                printf("Incorrect port number.\n");
-                returnVal = -3;
-            }
-            break;
-        case 'd':
-            if( getDebugLevel(optarg, &debugLevel) )
-            {
-                printf("Incorrect debug level.\n");
-                returnVal = -4;
-            }
             break;
 		case 's':
 			//safeStrNCpy(strHash, optarg, sizeof(strHash));
@@ -316,14 +301,10 @@ execute_tool(int 				argc,
         return 0;
     }
 
-    prepareTest(hostName, port, debugLevel);
-
     if(returnVal == 0)
     {
-		doPcrExtendOp(byteHash, pcr, algorithmId);
+		doPcrExtendOp(sapi_context, byteHash, pcr, algorithmId);
     }
-
-    finishTest();
 
     if(returnVal)
         return -9;

@@ -4,6 +4,7 @@
 #include "tpm_session.h"
 #include "tpm_hash.h"
 #include "string-bytes.h"
+#include "pcr.h"
 	
 
 #define SET_PCR_SELECT_BIT( pcrSelection, pcr ) \
