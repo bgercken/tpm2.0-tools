@@ -76,7 +76,8 @@ sbin_PROGRAMS = \
     tools/tpm2_unseal \
 	tools/tpm2_sealdata \
 	tools/tpm2_unsealdata \
-	tools/tpm2_extendpcr
+	tools/tpm2_extendpcr \
+	tools/tpm2_isowned
 
 noinst_LIBRARIES = $(LIB_COMMON)
 lib_libcommon_a_SOURCES = \
