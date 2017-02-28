@@ -12,7 +12,6 @@
 #include <sapi/tpm20.h>
 #include "sample.h"
 #include <tcti/tcti_socket.h>
-#include "common.h"
 #include "pcr.h"
 
 TPMS_AUTH_COMMAND sessionData;
@@ -172,7 +171,7 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
     return 0;
 }
 
-int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, 
+int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, 
 				const char *outputPublicFilepath, const char *outputPrivateFilepath, int o_flag, int O_flag, int I_flag, int b_flag, UINT32 objectAttributes, 
 				SESSION *policySession)
 {
@@ -243,7 +242,7 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
 
 	creationPCR.count = 0;
 
-    rval = Tss2_Sys_Create(sysContext, parentHandle, &sessionsData, inSensitive, inPublic,
+    rval = Tss2_Sys_Create(sapi_context, parentHandle, &sessionsData, inSensitive, inPublic,
             &outsideInfo, &creationPCR, &outPrivate,&outPublic,&creationData, &creationHash,
             &creationTicket, &sessionsDataOut);
 
@@ -269,7 +268,7 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
 }
 
 
-int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
+int createPrimary(TSS2_SYS_CONTEXT *sapi_context, TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag)
 {
 	TPM_RC rval;
 	TPMS_AUTH_RESPONSE sessionDataOut;
@@ -342,7 +341,7 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
 
     creationPCR.count = 0;
 
-    rval = Tss2_Sys_CreatePrimary(sysContext, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &handle2048rsa, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
+    rval = Tss2_Sys_CreatePrimary(sapi_context, hierarchy, &sessionsData, &inSensitive, inPublic, &outsideInfo, &creationPCR, &handle2048rsa, &outPublic, &creationData, &creationHash, &creationTicket, &name, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("\nCreatePrimary Failed ! ErrorCode: 0x%0x\n\n",rval);
@@ -355,7 +354,7 @@ int createPrimary(TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPMI_ALG_
 }
 
 //TODO: Might need to include inSensitive for CreatePrimary...maybe
-int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
+int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
 			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
 {
 
@@ -368,7 +367,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	TPM2B_DIGEST policyDigest;
 
 	//Build a trial policy gated by the provided PCR
-	rval = buildPolicyExternal(sysContext, &policySession, true, pcrList, pcrCount, &policyDigest, nameAlg);
+	rval = buildPolicyExternal(sapi_context, &policySession, true, pcrList, pcrCount, &policyDigest, nameAlg);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("buildPolicy() failed, ec: 0x%x\n", rval);
@@ -376,7 +375,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	}
 	
 	//Create the parent context
-	rval = createPrimary(hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
+	rval = createPrimary(sapi_context, hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("createPrimary() failed, ec: 0x%x\n", rval);
@@ -386,7 +385,7 @@ int seal(TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HAS
 	inPublic.t.publicArea.authPolicy.t.size = policyDigest.t.size;
 	memcpy(inPublic.t.publicArea.authPolicy.t.buffer, policyDigest.t.buffer, policyDigest.t.size);
 	//Seal the provided data
-	rval = create(handle2048rsa, &inPublic, inSensitive, type, nameAlg, outputPublicFilepath, outputPrivateFilepath, o_flag, O_flag, I_flag, b_flag, objectAttributes, policySession);
+	rval = create(sapi_context, handle2048rsa, &inPublic, inSensitive, type, nameAlg, outputPublicFilepath, outputPrivateFilepath, o_flag, O_flag, I_flag, b_flag, objectAttributes, policySession);
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("create() failed, ec: 0x%x\n", rval);
@@ -403,7 +402,6 @@ execute_tool(int 				argc,
 			 common_opts_t    	*opts,
              TSS2_SYS_CONTEXT 	*sapi_context)
 {
-	sysContext = sapi_context;	
     char hostName[200] = DEFAULT_HOSTNAME;
     int port = DEFAULT_RESMGR_TPM_PORT;
 	char pass[40];
@@ -570,22 +568,6 @@ execute_tool(int 				argc,
         case 'X':
             hexPasswd = true;
             break;
-        case 'p':
-            if( getPort(optarg, &port) )
-            {
-                printf("Incorrect port number.\n");
-                returnVal = -11;
-				break;
-            }
-            break;
-        case 'd':
-            if( getDebugLevel(optarg, &debugLevel) )
-            {
-                printf("Incorrect debug level.\n");
-                returnVal = -12;
-				break;
-            }
-            break;
 		case 'A':
             if(strcmp(optarg,"o") == 0 || strcmp(optarg,"O") == 0)
                 hierarchy = TPM_RH_OWNER;
@@ -632,10 +614,10 @@ execute_tool(int 				argc,
     else if(flagCnt >= 5 && I_flag == 1 && g_flag == 1 && G_flag == 1 && A_flag == 1 && r_flag == 1)
     {
         if(returnVal == 0)
-            returnVal = seal(&inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcrList, pcrCount, hierarchy);
+            returnVal = seal(sapi_context, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcrList, pcrCount, hierarchy);
 
         if (returnVal == 0 && n_flag)
-            returnVal = saveTpmContextToFile(sysContext, handle2048rsa, contextFilePath);
+            returnVal = saveTpmContextToFile(sapi_context, handle2048rsa, contextFilePath);
 
         if(returnVal)
             return -17;

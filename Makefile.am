@@ -55,7 +55,10 @@ sbin_PROGRAMS = \
     src/tpm2_quote \
     src/tpm2_takeownership \
     src/tpm2_getpubek \
-    src/tpm2_getpubak
+    src/tpm2_getpubak \
+	src/tpm2_extendpcr \
+	src/tpm2_sealdata \
+	src/tpm2_unsealdata
 
 COMMON_SRC = \
     src/context-util.c \
@@ -99,10 +102,7 @@ sbin_PROGRAMS += \
 		  src/tpm2_rsaencrypt \
 		  src/tpm2_sign \
 		  src/tpm2_unseal \
-		  src/tpm2_verifysignature \
-		  src/tpm2_extendpcr \
-		  src/tpm2_sealdata \
-		  src/tpm2_unsealdata
+		  src/tpm2_verifysignature
  
 COMMON_SRC += \
     src/common.c \
