@@ -343,6 +343,11 @@ execute_tool (int               argc,
 
         if (returnVal == 0 && C_flag)
             returnVal = saveTpmContextToFile(sapi_context, handle2048rsa, contextFile);
+		returnVal = Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
+		if(returnVal)
+		{
+			printf("Flush Context failed, ec:0x%x\n", returnVal);
+		}
         if(returnVal)
             return -12;
     }

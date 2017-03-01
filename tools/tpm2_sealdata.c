@@ -395,6 +395,8 @@ int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TP
 		return rval;
 	}
 
+	return rval;
+
 }
 
 
@@ -628,6 +630,15 @@ execute_tool(int 				argc,
 		//clean up pcr objects
 		for(int i = 0; i < pcrCount; i++)
 			free(pcrList[i]);
+		
+			
+		//clean up handle
+		returnVal = Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
+		if(returnVal != TPM_RC_SUCCESS)
+		{
+			printf("FlushContext failed for handle, ec: 0x%x\n", returnVal);
+			return -19;
+		}
     }
     else
     {

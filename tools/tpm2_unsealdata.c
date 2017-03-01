@@ -320,14 +320,14 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
         return -2;
     }*/
 
-	/*
-	//Now clean up our session
-	rval = Tss2_Sys_FlushContext( sysContext, policySession->sessionHandle );	
+	
+	//Now clean up our handle
+	rval = Tss2_Sys_FlushContext( sapi_context, handle2048rsa );
 	if(rval != TPM_RC_SUCCESS)
 	{
-		printf("FlushContext failed: Error Code: -x%x\n", rval);
+		printf("FlushContext failed: Error Code: 0x%x\n", rval);
 		return -3;
-	}*/
+	}
 
 	rval = tpm_session_auth_end(policySession);
 	if(rval != TPM_RC_SUCCESS)
@@ -545,6 +545,13 @@ execute_tool(int 			  argc,
 		//clean up pcr objects
 		for(int i = 0; i < pcrCount; i++)
 			free(pcrList[i]);
+
+		//clean up itemhandle
+		returnVal = Tss2_Sys_FlushContext(sapi_context, itemHandle);
+		if(returnVal)
+		{
+			printf("Flush Context itemHandle failed, ec:%x\n", returnVal);
+		}
 
         if(returnVal)
             return -15;
