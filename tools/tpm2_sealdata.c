@@ -358,7 +358,7 @@ int createPrimary(TSS2_SYS_CONTEXT *sapi_context, TPMI_RH_HIERARCHY hierarchy, T
 
 //TODO: Might need to include inSensitive for CreatePrimary...maybe
 int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, char *outputPublicFilepath, char *outputPrivateFilepath,
-			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, UINT32 objectAttributes, pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
+			int o_flag, int O_flag, int I_flag, int b_flag, int P_flag, int H_flag, UINT32 objectAttributes, pcr_struct **pcrList, UINT32 pcrCount, TPMI_RH_HIERARCHY hierarchy)
 {
 
 	//Create trial policy if pcr specified
@@ -378,11 +378,14 @@ int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TP
 	}
 	
 	//Create the parent context
-	rval = createPrimary(sapi_context, hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
-	if(rval != TPM_RC_SUCCESS)
+	if(!H_flag)
 	{
-		printf("createPrimary() failed, ec: 0x%x\n", rval);
-		return rval;
+		rval = createPrimary(sapi_context, hierarchy, &inPublic, TPM_ALG_RSA, nameAlg, P_flag); 
+		if(rval != TPM_RC_SUCCESS)
+		{
+			printf("createPrimary() failed, ec: 0x%x\n", rval);
+			return rval;
+		}
 	}
 	
 	inPublic.t.publicArea.authPolicy.t.size = policyDigest.t.size;
@@ -443,6 +446,7 @@ execute_tool(int 				argc,
       {"inFile",1,NULL,'I'},
       {"opu",1,NULL,'o'},
       {"opr",1,NULL,'O'},
+      {"handle",1,NULL,'H'},
       {"contextFile",1,NULL,'n'},
       {"passwdInHex",0,NULL,'X'},
       {0,0,0,0}
@@ -451,6 +455,7 @@ execute_tool(int 				argc,
     int returnVal = 0;
     int flagCnt = 0;
     int P_flag = 0,
+    	H_flag = 0,
         K_flag = 0,
         g_flag = 0,
         G_flag = 0,
@@ -555,6 +560,15 @@ execute_tool(int 				argc,
             }
             n_flag = 1;
             break;
+		case 'H':
+            if (!string_bytes_get_uint32(optarg, &handle2048rsa)) {
+                printf(
+                        "Could not convert object handle to a number, got: \"%s\"",
+                        optarg);
+                returnVal = -9;
+            }
+			H_flag = 1;
+			break;
         case 'r':
 			if ( pcr_parse_arg(optarg, &pcr, &forwardHash) )
 			{
@@ -619,7 +633,7 @@ execute_tool(int 				argc,
     else if(flagCnt >= 5 && I_flag == 1 && g_flag == 1 && G_flag == 1 && A_flag == 1 && r_flag == 1)
     {
         if(returnVal == 0)
-            returnVal = seal(sapi_context, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, objectAttributes, pcrList, pcrCount, hierarchy);
+            returnVal = seal(sapi_context, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, b_flag, P_flag, H_flag, objectAttributes, pcrList, pcrCount, hierarchy);
 
         if (returnVal == 0 && n_flag)
             returnVal = saveTpmContextToFile(sapi_context, handle2048rsa, contextFilePath);
