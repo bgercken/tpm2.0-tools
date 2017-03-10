@@ -320,15 +320,6 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
         return -2;
     }*/
 
-	
-	//Now clean up our handle
-	rval = Tss2_Sys_FlushContext( sapi_context, handle2048rsa );
-	if(rval != TPM_RC_SUCCESS)
-	{
-		printf("FlushContext failed: Error Code: 0x%x\n", rval);
-		return -3;
-	}
-
 	rval = tpm_session_auth_end(policySession);
 	if(rval != TPM_RC_SUCCESS)
 	{
@@ -553,6 +544,12 @@ execute_tool(int 			  argc,
 			printf("Flush Context itemHandle failed, ec:%x\n", returnVal);
 		}
 
+		//make sure handle2048 rsa is always cleaned
+		returnVal = Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
+		if(returnVal)
+		{
+			printf("Flush Context handle2048rsa failed, ec:%x\n", returnVal);
+		}
         if(returnVal)
             return -15;
     }
