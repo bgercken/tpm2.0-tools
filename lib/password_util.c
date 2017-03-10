@@ -33,17 +33,18 @@ bool password_util_to_auth(TPM2B_AUTH *password, bool is_hex, const char *descri
 bool password_util_copy_password(const char *password, const char *description, TPM2B_AUTH *dest) {
 
     if (!password) {
-        LOG_ERR("Please input the %s password!", description);
+        printf("Please input the %s password!", description);
         return false;
     }
 
     if (!dest || !description) {
+		printf("dest or description is null\n");
         return false;
     }
 
     size_t len = strlen(password);
     if (len >= PASSWORD_MAX) {
-        LOG_ERR("Over-length password for %s. Got %zu expected less than %zu!", description, len, PASSWORD_MAX);
+        printf("Over-length password for %s. Got %zu expected less than %zu!", description, len, PASSWORD_MAX);
         return false;
     }
 

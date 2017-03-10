@@ -78,7 +78,7 @@ static int evict_control(tpm_evictcontrol_ctx *ctx) {
 
     TPM_RC rval = Tss2_Sys_EvictControl(ctx->sapi_context, ctx->auth, ctx->handle.object, &sessions_data, ctx->handle.persist,&sessions_data_out);
     if (rval != TPM_RC_SUCCESS) {
-        LOG_ERR("EvictControl failed, error code: 0x%x\n", rval);
+        printf("EvictControl failed, error code: 0x%x\n", rval);
         return false;
     }
     return true;
@@ -107,7 +107,7 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
 
     char contextFile[PATH_MAX];
 
-    bool is_hex_passwd;
+    bool is_hex_passwd = false;
 
     if (argc == 1) {
         showArgMismatch(argv[0]);
@@ -124,7 +124,7 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
             } else if (!strcasecmp(optarg, "p")) {
                 ctx->auth = TPM_RH_PLATFORM;
             } else {
-                LOG_ERR("Incorrect auth value, got: \"%s\", expected [o|O|p|P!",
+                printf("Incorrect auth value, got: \"%s\", expected [o|O|p|P!",
                         optarg);
                 return false;
             }
@@ -133,7 +133,7 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
         case 'H': {
             bool result = string_bytes_get_uint32(optarg, &ctx->handle.object);
             if (!result) {
-                LOG_ERR(
+                printf(
                         "Could not convert object handle to a number, got: \"%s\"",
                         optarg);
                 return false;
@@ -144,7 +144,7 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
         case 'S': {
             bool result = string_bytes_get_uint32(optarg, &ctx->handle.persist);
             if (!result) {
-                LOG_ERR(
+                printf(
                         "Could not convert persistent handle to a number, got: \"%s\"",
                         optarg);
                 return false;
@@ -155,7 +155,8 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
         case 'P': {
             bool result = password_util_copy_password(optarg, "authenticating",
                     &ctx->session_data.hmac);
-            if (result) {
+            if (!result) {
+				printf("Couldn't copy password.\n");
                 return false;
             }
             flags.P = 1;
@@ -166,28 +167,30 @@ static bool init(int argc, char *argv[], tpm_evictcontrol_ctx *ctx) {
             flags.c = 1;
             break;
         case 'X':
+			printf("setting hex passwd to true\n");
             is_hex_passwd = true;
             break;
         case ':':
-            LOG_ERR("Argument %c needs a value!\n", optopt);
+            printf("Argument %c needs a value!\n", optopt);
             return false;
         case '?':
-            LOG_ERR("Unknown Argument: %c\n", optopt);
+            printf("Unknown Argument: %c\n", optopt);
             return false;
         default:
-            LOG_ERR("?? getopt returned character code 0%o ??\n", opt);
+            printf("?? getopt returned character code 0%o ??\n", opt);
             return false;
         }
     }
 
     if (!(flags.A && (flags.H || flags.c) && flags.S)) {
-        LOG_ERR("Invalid arguments");
+        printf("Invalid arguments");
         return false;
     }
 
     bool result = password_util_to_auth(&ctx->session_data.hmac, is_hex_passwd,
             "authenticating", &ctx->session_data.hmac);
     if (!result) {
+		printf("Failed to convert password to tpm auth");
         return false;
     }
 
@@ -218,6 +221,7 @@ int execute_tool(int argc, char *argv[], char *envp[], common_opts_t *opts,
 
     ctx.session_data.sessionHandle = TPM_RS_PW;
 
+	printf("calling init \n");
     bool result = init(argc, argv, &ctx);
     if (!result) {
         return 1;
