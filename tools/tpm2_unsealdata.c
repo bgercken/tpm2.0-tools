@@ -538,18 +538,10 @@ execute_tool(int 			  argc,
 			free(pcrList[i]);
 
 		//clean up itemhandle
-		returnVal = Tss2_Sys_FlushContext(sapi_context, itemHandle);
-		if(returnVal)
-		{
-			printf("Flush Context itemHandle failed, ec:%x\n", returnVal);
-		}
+		Tss2_Sys_FlushContext(sapi_context, itemHandle);
 
 		//make sure handle2048 rsa is always cleaned
-		returnVal = Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
-		if(returnVal)
-		{
-			printf("Flush Context handle2048rsa failed, ec:%x\n", returnVal);
-		}
+		Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
         if(returnVal)
             return -15;
     }
