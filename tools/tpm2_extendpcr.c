@@ -243,9 +243,7 @@ execute_tool(int 				argc,
 			//	returnVal = -5;
 			//	break;
 			//}
-			printf("%s\n", optarg);
 			memcpy(byteHash, optarg, sizeof(byteHash));
-			printf("%s\n", byteHash);
 			/*if ( hex2ByteStructure(strHash, &byteLength, byteHash) != 0)
 			{
 				printf("Failed to convert string representation of hash to byte array");
