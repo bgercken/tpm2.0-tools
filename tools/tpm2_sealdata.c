@@ -48,6 +48,7 @@ int setAlgCreate(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPubl
     inPublic->t.publicArea.objectAttributes.fixedTPM = 1;
     inPublic->t.publicArea.objectAttributes.fixedParent = 1;
     inPublic->t.publicArea.objectAttributes.sensitiveDataOrigin = 1;
+    inPublic->t.publicArea.objectAttributes.noDA = 1;
 
     inPublic->t.publicArea.type = type;
     switch(type)
@@ -127,6 +128,7 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
     inPublic->t.publicArea.objectAttributes.fixedTPM = 1;
     inPublic->t.publicArea.objectAttributes.fixedParent = 1;
     inPublic->t.publicArea.objectAttributes.sensitiveDataOrigin = 1;
+    inPublic->t.publicArea.objectAttributes.noDA = 1;
     inPublic->t.publicArea.authPolicy.t.size = 0;
 
     inPublic->t.publicArea.type = type;
