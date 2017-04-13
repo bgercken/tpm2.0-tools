@@ -651,7 +651,6 @@ execute_tool(int 				argc,
 		if(returnVal != TPM_RC_SUCCESS)
 		{
 			printf("FlushContext failed for handle, ec: 0x%x\n", returnVal);
-			return -19;
 		}
     }
     else
