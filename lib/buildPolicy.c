@@ -61,6 +61,7 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 				pcrReadIndex++; //inc number of pcrs we actually intend to read.
 			} else {
 				j--; //don't increment our batch counter if there's a forwardHash to process
+				remaining--; //one less to read from tpm
 			}
 		}
 

@@ -369,6 +369,8 @@ int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TP
 	TPM2B_PUBLIC inPublic;
 	TPM2B_DIGEST policyDigest;
 
+	printf("Calling build policy external\n");
+
 	//Build a trial policy gated by the provided PCR
 	rval = buildPolicyExternal(sapi_context, &policySession, true, pcrList, pcrCount, &policyDigest, nameAlg);
 	if(rval != TPM_RC_SUCCESS)
@@ -391,6 +393,7 @@ int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TP
 	inPublic.t.publicArea.authPolicy.t.size = policyDigest.t.size;
 	memcpy(inPublic.t.publicArea.authPolicy.t.buffer, policyDigest.t.buffer, policyDigest.t.size);
 	//Seal the provided data
+	printf("Calling create\n");
 	rval = create(sapi_context, handle2048rsa, &inPublic, inSensitive, type, nameAlg, outputPublicFilepath, outputPrivateFilepath, o_flag, O_flag, I_flag, b_flag, objectAttributes, policySession);
 	if(rval != TPM_RC_SUCCESS)
 	{
