@@ -68,7 +68,10 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 		memset(&tmpPcrValues, 0, sizeof(TPML_DIGEST));
 		rval = Tss2_Sys_PCR_Read( sysContext, 0, &pcrsTmp, &pcrUpdateCounter, &pcrSelectionOut, &tmpPcrValues, 0 );
 		if( rval != TPM_RC_SUCCESS )
+		{
+			printf("BuildPCRPolicy, first pcr read failed\n");
 			return rval;
+		}
 
 		//populate the hashes into our list of hashes
 		for(int i = 0; i < tmpPcrValues.count; i++)
@@ -95,16 +98,53 @@ int buildPcrPolicy( TSS2_SYS_CONTEXT *sysContext, SESSION *policySession, TPM2B_
 		}
 	}
 
+	/* set our final pcr's bank */
+	pcrs.count = 2;
+	pcrs.pcrSelections[1].hash = TPM_ALG_SHA1;
+	pcrs.pcrSelections[1].sizeofSelect = 3;
+	pcrs.pcrSelections[1].pcrSelect[0] = 0;
+	pcrs.pcrSelections[1].pcrSelect[1] = 0;
+	pcrs.pcrSelections[1].pcrSelect[2] = 0;
+	SET_PCR_SELECT_BIT(pcrs.pcrSelections[1], 0);
+	SET_PCR_SELECT_BIT(pcrs.pcrSelections[1], 1);
+	SET_PCR_SELECT_BIT(pcrs.pcrSelections[1], 2);
+	SET_PCR_SELECT_BIT(pcrs.pcrSelections[1], 3);
+
+	/* set read pcrs 0-3 for sha1 */
+	zero_pcr_selection(&pcrsTmp, TPM_ALG_SHA1);
+	SET_PCR_SELECT_BIT(pcrsTmp.pcrSelections[0], 0);
+	SET_PCR_SELECT_BIT(pcrsTmp.pcrSelections[0], 1);
+	SET_PCR_SELECT_BIT(pcrsTmp.pcrSelections[0], 2);
+	SET_PCR_SELECT_BIT(pcrsTmp.pcrSelections[0], 3);
+
+	/* read selected pcrs */
+	memset(&tmpPcrValues, 0, sizeof(TPML_DIGEST));
+	rval = Tss2_Sys_PCR_Read( sysContext, 0, &pcrsTmp, &pcrUpdateCounter, &pcrSelectionOut, &tmpPcrValues, 0 );
+	if( rval != TPM_RC_SUCCESS ) {
+		printf("BuildPCRPolicy, second pcr read failed\n");
+		return rval;
+	}
+	/* add read pcrs into pcrValues MAX_BUFFER list */	
+	for(int i = 0; i < tmpPcrValues.count; i++)
+	{	
+		pcrValues[pcrReadIndex].t.size = tmpPcrValues.digests[i].t.size; 
+		memcpy(pcrValues[pcrReadIndex].t.buffer, tmpPcrValues.digests[i].t.buffer, tmpPcrValues.digests[i].t.size);
+		pcrReadIndex++;
+	}
+
 	// Hash them together
 	INIT_SIMPLE_TPM2B_SIZE( pcrDigest );
 	rval = hash_sequence_ex( sysContext, policySession->authHash, pcrCountIn, &pcrValues[0], &pcrDigest );
-	if( rval != TPM_RC_SUCCESS )
+	if( rval != TPM_RC_SUCCESS ) {
+		printf("hash_sequence_ex failed\n");	
 		return rval;
+	}
 
 	rval = Tss2_Sys_PolicyPCR( sysContext, policySession->sessionHandle, 0, &pcrDigest, &pcrs, 0 );
-	if( rval != TPM_RC_SUCCESS )
+	if( rval != TPM_RC_SUCCESS ) {
+		printf("policyPCR failed\n");	
 		return rval;
-
+	}
    return rval;
 }
 
