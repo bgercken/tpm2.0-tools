@@ -122,7 +122,7 @@ int buildPolicyExternal(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession, i
     // Start policy session.
     symmetric.algorithm = TPM_ALG_NULL;
 	rval = tpm_session_start_auth_with_params(sysContext, policySession, TPM_RH_NULL, 0, TPM_RH_NULL, 0, &nonceCaller, &encryptedSalt,
-		trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, TPM_ALG_SHA256);  
+		trial ? TPM_SE_TRIAL : TPM_SE_POLICY, &symmetric, nameAlg);
     if( rval != TPM_RC_SUCCESS )
 	{
 		printf("BuildPolicyExternal, Unable to Start Auth Session, Error Code: 0x%x\n", rval);

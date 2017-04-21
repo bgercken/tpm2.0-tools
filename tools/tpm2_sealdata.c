@@ -544,11 +544,7 @@ execute_tool(int 				argc,
             break;
         case 'O':
             snprintf(oprFilePath, sizeof(oprFilePath), "%s", optarg);
-            if(checkOutFile(oprFilePath) != 0)
-            {
-                returnVal = -8;
-                break;
-            }
+			//Allow output file to be overwritten
             O_flag = 1;
             break;
         case 'n':
