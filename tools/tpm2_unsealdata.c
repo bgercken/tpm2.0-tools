@@ -260,6 +260,8 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("buildPolicy() failed, ec: 0x%x\n", rval);
+		if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS) 
+			printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
 		return rval;
 	}
 
@@ -279,6 +281,8 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
 	if(rval != TPM_RC_SUCCESS)
 	{
 		printf("load() failed, ec: 0x%x\n", rval);
+		if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS) 
+			printf("tpm2_session_auth_end failed\n");
 		return rval;
 	}
 
@@ -308,7 +312,9 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, const c
     if(rval != TPM_RC_SUCCESS)
     {
         printf("unseal() failed. ec: 0x%x\n", rval);
-        return -1;
+		if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS) 
+			printf("tpm2_session_auth_end failed\n");
+        return rval;
     }
 
 	//Write data directly to stdout, to be consumed by the caller
@@ -538,7 +544,7 @@ execute_tool(int 			  argc,
 			free(pcrList[i]);
 
 		//clean up itemhandle
-		Tss2_Sys_FlushContext(sapi_context, itemHandle);
+		//Tss2_Sys_FlushContext(sapi_context, itemHandle);
 
 		//make sure handle2048 rsa is always cleaned
 		Tss2_Sys_FlushContext(sapi_context, handle2048rsa);
