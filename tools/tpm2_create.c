@@ -45,6 +45,7 @@
 #include "main.h"
 #include "options.h"
 #include "string-bytes.h"
+#include "shared.h"
 
 TSS2_SYS_CONTEXT *sysContext;
 TPMS_AUTH_COMMAND sessionData;
@@ -130,7 +131,7 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, in
     return 0;
 }
 
-int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes)
+int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes)
 {
     TPM_RC rval;
     TPMS_AUTH_RESPONSE sessionDataOut;
@@ -148,6 +149,9 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
     TPM2B_DIGEST            creationHash = TPM2B_TYPE_INIT(TPM2B_DIGEST, buffer);
     TPMT_TK_CREATION        creationTicket = { 0, };
 
+    if(sapi_context)
+        sysContext = sapi_context;
+
     sessionDataArray[0] = &sessionData;
     sessionDataOutArray[0] = &sessionDataOut;
 
@@ -161,6 +165,9 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
 
     sessionsData.cmdAuthsCount = 1;
     sessionsData.cmdAuths[0] = &sessionData;
+
+    //Set hmac size to 0, sealing using adminWithPolicy
+    sessionData.hmac.t.size = 0;
     if (sessionData.hmac.t.size > 0 && hexPasswd)
     {
         sessionData.hmac.t.size = sizeof(sessionData.hmac) - 2;
@@ -219,229 +226,5 @@ int create(TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_
             return -4;
     }
 
-    return 0;
-}
-
-int
-execute_tool (int              argc,
-              char             *argv[],
-              char             *envp[],
-              common_opts_t    *opts,
-              TSS2_SYS_CONTEXT *sapi_context)
-{
-    (void)envp;
-    (void)opts;
-
-    sysContext = sapi_context;
-
-    TPM2B_SENSITIVE_CREATE  inSensitive;
-    inSensitive.t.sensitive.data.t.size = 0;
-    TPM2B_PUBLIC            inPublic;
-    TPMI_ALG_PUBLIC type;
-    TPMI_ALG_HASH nameAlg;
-    TPMI_DH_OBJECT parentHandle;
-    UINT32 objectAttributes = 0;
-    char opuFilePath[PATH_MAX] = {0};
-    char oprFilePath[PATH_MAX] = {0};
-    char *contextParentFilePath = NULL;
-
-    setbuf(stdout, NULL);
-    setvbuf (stdout, NULL, _IONBF, BUFSIZ);
-
-    int opt = -1;
-    const char *optstring = "H:P:K:g:G:A:I:L:o:O:c:X";
-    static struct option long_options[] = {
-      {"parent",1,NULL,'H'},
-      {"pwdp",1,NULL,'P'},
-      {"pwdk",1,NULL,'K'},
-      {"halg",1,NULL,'g'},
-      {"kalg",1,NULL,'G'},
-      {"objectAttributes",1,NULL,'A'},
-      {"inFile",1,NULL,'I'},
-      {"policyFile",1,NULL,'L'},
-      {"opu",1,NULL,'o'},
-      {"opr",1,NULL,'O'},
-      {"contextParent",1,NULL,'c'},
-      {"passwdInHex",0,NULL,'X'},
-      {0,0,0,0}
-    };
-
-
-    int returnVal = 0;
-    int flagCnt = 0;
-    int H_flag = 0,
-        P_flag = 0,
-        K_flag = 0,
-        g_flag = 0,
-        G_flag = 0,
-        A_flag = 0,
-        I_flag = 0,
-        L_flag = 0,
-        o_flag = 0,
-        c_flag = 0,
-        O_flag = 0/*,
-        f_flag = 0*/;
-
-    while((opt = getopt_long(argc,argv,optstring,long_options,NULL)) != -1)
-    {
-        switch(opt)
-        {
-        case 'H':
-            if(!string_bytes_get_uint32(optarg,&parentHandle))
-            {
-                showArgError(optarg, argv[0]);
-                returnVal = -1;
-                break;
-            }
-            H_flag = 1;
-            break;
-
-        case 'P':
-            sessionData.hmac.t.size = sizeof(sessionData.hmac.t) - 2;
-            if(str2ByteStructure(optarg,&sessionData.hmac.t.size,sessionData.hmac.t.buffer) != 0)
-            {
-                returnVal = -2;
-                break;
-            }
-            P_flag = 1;
-            break;
-        case 'K':
-            inSensitive.t.sensitive.userAuth.t.size = sizeof(inSensitive.t.sensitive.userAuth.t) - 2;
-            if(str2ByteStructure(optarg,&inSensitive.t.sensitive.userAuth.t.size, inSensitive.t.sensitive.userAuth.t.buffer) != 0)
-            {
-                returnVal = -3;
-                break;
-            }
-            K_flag = 1;
-            break;
-        case 'g':
-            if(!string_bytes_get_uint16(optarg,&nameAlg))
-            {
-                showArgError(optarg, argv[0]);
-                returnVal = -4;
-                break;
-            }
-            printf("nameAlg = 0x%4.4x\n", nameAlg);
-            g_flag = 1;
-            break;
-        case 'G':
-            if(!string_bytes_get_uint16(optarg,&type))
-            {
-                showArgError(optarg, argv[0]);
-                returnVal = -5;
-                break;
-            }
-            printf("type = 0x%4.4x\n", type);
-            G_flag = 1;
-            break;
-        case 'A':
-            if(!string_bytes_get_uint32(optarg,&objectAttributes))
-            {
-                showArgError(optarg, argv[0]);
-                returnVal = -6;
-                break;
-            }
-            A_flag = 1;//H_flag = 1;
-            break;
-        case 'I':
-            inSensitive.t.sensitive.data.t.size = sizeof(inSensitive.t.sensitive.data) - 2;
-            if(!files_load_bytes_from_file(optarg, inSensitive.t.sensitive.data.t.buffer, &inSensitive.t.sensitive.data.t.size))
-            {
-                returnVal = -7;
-                break;
-            }
-            I_flag = 1;
-            printf("inSensitive.t.sensitive.data.t.size = %d\n",inSensitive.t.sensitive.data.t.size);
-            break;
-        case 'L':
-            inPublic.t.publicArea.authPolicy.t.size = sizeof(inPublic.t.publicArea.authPolicy) - 2;
-            if(!files_load_bytes_from_file(optarg, inPublic.t.publicArea.authPolicy.t.buffer, &inPublic.t.publicArea.authPolicy.t.size))
-            {
-                returnVal = -8;
-                break;
-            }
-            L_flag = 1;
-            break;
-        case 'o':
-            snprintf(opuFilePath, sizeof(opuFilePath), "%s", optarg);
-            if(files_does_file_exist(opuFilePath) != 0)
-            {
-                returnVal = -9;
-                break;
-            }
-            o_flag = 1;
-            break;
-        case 'O':
-            snprintf(oprFilePath, sizeof(oprFilePath), "%s", optarg);
-            if(files_does_file_exist(oprFilePath) != 0)
-            {
-                returnVal = -10;
-                break;
-            }
-            O_flag = 1;
-            break;
-        case 'c':
-            contextParentFilePath = optarg;
-            if(contextParentFilePath == NULL || contextParentFilePath[0] == '\0')
-            {
-                returnVal = -11;
-                break;
-            }
-            printf("contextParentFile = %s\n", contextParentFilePath);
-            c_flag = 1;
-            break;
-        case 'X':
-            hexPasswd = true;
-            break;
-        case ':':
-//              printf("Argument %c needs a value!\n",optopt);
-            returnVal = -14;
-            break;
-        case '?':
-//              printf("Unknown Argument: %c\n",optopt);
-            returnVal = -15;
-            break;
-        //default:
-        //  break;
-        }
-        if(returnVal)
-            break;
-    };
-
-    if(returnVal != 0)
-        return returnVal;
-
-    if(P_flag == 0)
-        sessionData.hmac.t.size = 0;
-    if(I_flag == 0)
-        inSensitive.t.sensitive.data.t.size = 0;
-    if(K_flag == 0)
-        inSensitive.t.sensitive.userAuth.t.size = 0;
-    if(L_flag == 0)
-        inPublic.t.publicArea.authPolicy.t.size = 0;
-
-    *((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
-
-    flagCnt = H_flag + g_flag + G_flag + c_flag ;
-    if(flagCnt == 1)
-    {
-        showArgMismatch(argv[0]);
-        return -16;
-    }
-    else if(flagCnt == 3 && (H_flag == 1 || c_flag == 1) && g_flag == 1 && G_flag == 1)
-    {
-        if(c_flag)
-            returnVal = file_load_tpm_context_from_file(sysContext, &parentHandle, contextParentFilePath) != true;
-        if(returnVal == 0)
-            returnVal = create(parentHandle, &inPublic, &inSensitive, type, nameAlg, opuFilePath, oprFilePath, o_flag, O_flag, I_flag, A_flag, objectAttributes);
-
-        if(returnVal)
-            return -17;
-    }
-    else
-    {
-        showArgMismatch(argv[0]);
-        return -18;
-    }
     return 0;
 }

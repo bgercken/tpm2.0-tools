@@ -7,7 +7,7 @@
 #include "pcr.h"
 #include "string-bytes.h"
 
-static int pcr_get_id(const char *arg, UINT32 *pcrId)
+int pcr_get_id(const char *arg, UINT32 *pcrId)
 {
     UINT32 n = 0;
 
@@ -61,6 +61,25 @@ static int pcr_parse_selection(const char *str, int len, TPMS_PCR_SELECTION *pcr
     return 0;
 }
 
+int pcr_parse_arg(char *arg, UINT32 *pcrId, BYTE *forwardHash)
+{
+    char * pstr;
+    UINT16 length;
+    int ret = 0;
+    if (strchr(arg, ':')) {
+        //read forward hash and convert to hex to byte
+        pstr = strtok(arg, ":");
+        if (pstr)
+            ret = pcr_get_id(pstr, pcrId);
+
+        pstr = strtok(arg, ":");
+        if (pstr)
+            hex2ByteStructure(pstr, &length, forwardHash);
+    } else {
+        ret = pcr_get_id(arg, pcrId);
+    }
+    return ret;
+}
 
 int pcr_parse_selections(const char *arg, TPML_PCR_SELECTION *pcrSels) {
     const char *strLeft = arg;

@@ -69,7 +69,7 @@ HASH_SIZE_INFO   hashSizes[] = {
     {TPM_ALG_NULL,0}
 };
 
-static UINT16 GetDigestSize( TPM_ALG_ID authHash )
+UINT16 GetDigestSize( TPM_ALG_ID authHash )
 {
     UINT32 i;
     for(i = 0; i < (sizeof(hashSizes)/sizeof(HASH_SIZE_INFO)); i++ )
