@@ -41,7 +41,6 @@ AM_LDFLAGS   := $(EXTRA_LDFLAGS)
 LDADD = $(LIB_COMMON) $(TPM20_TSS_LIBS) $(TCTI_SOCK_LIBS) $(TCTI_DEV_LIBS)
 
 sbin_PROGRAMS = \
-    tools/tpm2_create \
     tools/tpm2_createprimary \
     tools/tpm2_load \
     tools/tpm2_send_command \
@@ -76,7 +75,10 @@ sbin_PROGRAMS = \
     tools/tpm2_rsadecrypt \
     tools/tpm2_rsaencrypt \
     tools/tpm2_sign \
-    tools/tpm2_unseal
+    tools/tpm2_unseal \
+    tools/tpm2_sealdata \
+    tools/tpm2_unsealdata \
+    tools/tpm2_extendpcr
 
 noinst_LIBRARIES = $(LIB_COMMON)
 lib_libcommon_a_SOURCES = \
@@ -94,7 +96,6 @@ lib_libcommon_a_SOURCES = \
     lib/tpm_kdfa.c \
     lib/tpm_session.c
 
-tools_tpm2_create_SOURCES = tools/tpm2_create.c tools/main.c
 tools_tpm2_createprimary_SOURCES = tools/tpm2_createprimary.c tools/main.c
 tools_tpm2_dump_capability_SOURCES = tools/tpm2_dump_capability.c tools/main.c
 tools_tpm2_listpcrs_SOURCES = tools/tpm2_listpcrs.c tools/main.c
@@ -134,6 +135,9 @@ tools_tpm2_unseal_SOURCES = tools/tpm2_unseal.c tools/main.c
 
 # rc_decode does not use common main, since it does not need a dynamic TCTI.
 tools_tpm2_rc_decode_SOURCES = lib/rc-decode.c tools/tpm2_rc_decode.c
+tools_tpm2_extendpcr_SOURCES = tools/tpm2_extendpcr.c tools/main.c
+tools_tpm2_sealdata_SOURCES = tools/tpm2_sealdata.c tools/main.c tools/tpm2_create.c lib/build-policy.c
+tools_tpm2_unsealdata_SOURCES = tools/tpm2_unsealdata.c tools/main.c lib/build-policy.c
 
 if UNIT
 TESTS = $(check_PROGRAMS)

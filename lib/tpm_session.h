@@ -133,4 +133,10 @@ TPM_RC tpm_session_start_auth_with_params(TSS2_SYS_CONTEXT *sapi_context, SESSIO
  */
 TPM_RC tpm_session_auth_end( SESSION *session);
 
+/**
+ * @param authHash
+ * @return
+ */
+UINT16 GetDigestSize( TPM_ALG_ID authHash);
+
 #endif /* SRC_TPM_SESSION_H_ */
