@@ -122,7 +122,6 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic)
     }
     return 0;
 }
-
 int createPrimary(TSS2_SYS_CONTEXT *sysContext, TPMI_RH_HIERARCHY hierarchy, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, int P_flag, int K_flag)
 {
     UINT32 rval;
@@ -209,6 +208,8 @@ execute_tool (int               argc,
 {
     (void) envp;
     (void) opts;
+    char pass[40];
+    char *index = NULL;
 
     TPM2B_SENSITIVE_CREATE  inSensitive;
     TPM2B_PUBLIC            inPublic;
@@ -220,7 +221,7 @@ execute_tool (int               argc,
     setvbuf (stdout, NULL, _IONBF, BUFSIZ);
 
     int opt = -1;
-    const char *optstring = "A:P:K:g:G:C:X";
+    const char *optstring = "A:PK:g:G:C:X";
     static struct option long_options[] = {
       {"auth",1,NULL,'A'},
       {"pwdp",1,NULL,'P'},
@@ -264,8 +265,12 @@ execute_tool (int               argc,
             break;
 
         case 'P':
+            fgets(pass, 40, stdin);
+            index = strchr(pass, '\n');
+            if (index)
+                *index = '\0';
             sessionData.hmac.t.size = sizeof(sessionData.hmac.t) - 2;
-            if(str2ByteStructure(optarg,&sessionData.hmac.t.size,sessionData.hmac.t.buffer) != 0)
+            if(str2ByteStructure(pass,&sessionData.hmac.t.size,sessionData.hmac.t.buffer) != 0)
             {
                 returnVal = -2;
                 break;
