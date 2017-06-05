@@ -48,7 +48,8 @@
 #include "shared.h"
 
 TSS2_SYS_CONTEXT *sysContext;
-TPMS_AUTH_COMMAND sessionData;
+TPMS_AUTH_COMMAND sessionData1;
+TPMS_AUTH_COMMAND sessionData256;
 bool hexPasswd = false;
 
 int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, int I_flag)
@@ -131,14 +132,15 @@ int setAlg(TPMI_ALG_PUBLIC type,TPMI_ALG_HASH nameAlg,TPM2B_PUBLIC *inPublic, in
     return 0;
 }
 
-int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes)
+int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PUBLIC *inPublic, TPM2B_SENSITIVE_CREATE *inSensitive, TPMI_ALG_PUBLIC type, TPMI_ALG_HASH nameAlg, const char *opuFilePath, const char *oprFilePath, int o_flag, int O_flag, int I_flag, int A_flag, UINT32 objectAttributes, SESSION* policySession1, SESSION* policySession256)
 {
     TPM_RC rval;
-    TPMS_AUTH_RESPONSE sessionDataOut;
+    TPMS_AUTH_RESPONSE sessionDataOut1;
+    TPMS_AUTH_RESPONSE sessionDataOut256;
     TSS2_SYS_CMD_AUTHS sessionsData;
     TSS2_SYS_RSP_AUTHS sessionsDataOut;
-    TPMS_AUTH_COMMAND *sessionDataArray[1];
-    TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
+    TPMS_AUTH_COMMAND *sessionDataArray[2];
+    TPMS_AUTH_RESPONSE *sessionDataOutArray[2];
 
     TPM2B_DATA              outsideInfo = { { 0, } };
     TPML_PCR_SELECTION      creationPCR;
@@ -152,28 +154,35 @@ int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PU
     if(sapi_context)
         sysContext = sapi_context;
 
-    sessionDataArray[0] = &sessionData;
-    sessionDataOutArray[0] = &sessionDataOut;
+    sessionDataArray[0] = &sessionData1;
+    sessionDataOutArray[0] = &sessionDataOut1;
+
+    sessionDataArray[1] = &sessionData256;
+    sessionDataOutArray[1] = &sessionDataOut256;
 
     sessionsDataOut.rspAuths = &sessionDataOutArray[0];
     sessionsData.cmdAuths = &sessionDataArray[0];
 
-    sessionsDataOut.rspAuthsCount = 1;
+    sessionsDataOut.rspAuthsCount = 2;
+    sessionsData.cmdAuthsCount = 2;
 
-    sessionData.sessionHandle = TPM_RS_PW;
-    sessionData.nonce.t.size = 0;
+    sessionData1.sessionHandle = TPM_RS_PW;
+    sessionData1.nonce.t.size = 0;
+    *((UINT8 *)((void *)&sessionData1.sessionAttributes)) = 0;
 
-    sessionsData.cmdAuthsCount = 1;
-    sessionsData.cmdAuths[0] = &sessionData;
+    sessionData256.sessionHandle = TPM_RS_PW;
+    sessionData256.nonce.t.size = 0;
+    *((UINT8 *)((void *)&sessionData256.sessionAttributes)) = 0;
 
     //Set hmac size to 0, sealing using adminWithPolicy
-    sessionData.hmac.t.size = 0;
-    if (sessionData.hmac.t.size > 0 && hexPasswd)
+    sessionData1.hmac.t.size = 0;
+    sessionData256.hmac.t.size = 0;
+    if (sessionData1.hmac.t.size > 0 && hexPasswd)
     {
-        sessionData.hmac.t.size = sizeof(sessionData.hmac) - 2;
-        if (hex2ByteStructure((char *)sessionData.hmac.t.buffer,
-                              &sessionData.hmac.t.size,
-                              sessionData.hmac.t.buffer) != 0)
+        sessionData1.hmac.t.size = sizeof(sessionData1.hmac) - 2;
+        if (hex2ByteStructure((char *)sessionData1.hmac.t.buffer,
+                              &sessionData1.hmac.t.size,
+                              sessionData1.hmac.t.buffer) != 0)
         {
             printf( "Failed to convert Hex format password for parent Passwd.\n");
             return -1;
@@ -201,6 +210,9 @@ int create(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT parentHandle, TPM2B_PU
     printf("ObjectAttribute: 0x%08X\n",inPublic->t.publicArea.objectAttributes.val);
 
     creationPCR.count = 0;
+
+    sessionData1.sessionHandle = policySession1->sessionHandle;
+    sessionData256.sessionHandle = policySession256->sessionHandle;
 
     rval = Tss2_Sys_Create(sysContext, parentHandle, &sessionsData, inSensitive, inPublic,
             &outsideInfo, &creationPCR, &outPrivate,&outPublic,&creationData, &creationHash,

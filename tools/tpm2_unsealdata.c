@@ -51,6 +51,7 @@
 #include "files.h"
 
 TPMS_AUTH_COMMAND sessionData;
+TPMS_AUTH_COMMAND sessionData256;
 int hexPasswd = false;
 TPM_HANDLE handle2048rsa;
 int debugLevel = 0;
@@ -107,17 +108,33 @@ UINT32 load(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, TPM2B_PUB
 UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, int P_flag, TPM2B_PUBLIC *inPublic, TPM2B_PRIVATE *inPrivate, TPMI_ALG_HASH nameAlg,
                 pcr_struct **pcrList, INT32 pcrCount)
 {
+    (void) nameAlg;
     UINT32 rval;
-    SESSION *policySession;
-    TPM2B_DIGEST policyDigest; //unused for now here but build_policy_external needs to return the policy for sealdata.
+    SESSION *policySession1, *policySession256;
+    TPM2B_DIGEST policyDigest1, policyDigest256; //unused for now here but build_policy_external needs to return the policy for sealdata.
 
-    rval = build_policy_external(sapi_context, &policySession, false, pcrList, pcrCount, &policyDigest, nameAlg);  //Build real policy, don't write to file
+    rval = build_policy_external(sapi_context, &policySession1, false, pcrList, pcrCount, &policyDigest1, TPM_ALG_SHA1);  //Build real policy, don't write to file
     if(rval != TPM_RC_SUCCESS)
     {
         printf("build_policy() failed, ec: 0x%x\n", rval);
-        Tss2_Sys_FlushContext( sapi_context, policySession->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
          
-        if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS)
+        if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
+
+        return rval;
+    }
+
+    rval = build_policy_external(sapi_context, &policySession256, false, pcrList, pcrCount, &policyDigest256, TPM_ALG_SHA256);  //Build real policy, don't write to file
+    if(rval != TPM_RC_SUCCESS)
+    {
+        printf("build_policy() failed, ec: 0x%x\n", rval);
+        Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
+         
+        if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
+        if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
             printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
 
         return rval;
@@ -127,43 +144,58 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, int P_f
     if(rval != TPM_RC_SUCCESS)
     {
         printf("load() failed, ec: 0x%x\n", rval);
-        Tss2_Sys_FlushContext( sapi_context, policySession->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
 
-        if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS)
+        if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
+        if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
             printf("tpm2_session_auth_end failed\n");
 
         return rval;
     }
 
     TPMS_AUTH_RESPONSE sessionDataOut;
+    TPMS_AUTH_RESPONSE sessionDataOut256;
     TSS2_SYS_CMD_AUTHS sessionsData;
     TSS2_SYS_RSP_AUTHS sessionsDataOut;
-    TPMS_AUTH_COMMAND *sessionDataArray[1];
-    TPMS_AUTH_RESPONSE *sessionDataOutArray[1];
+    TPMS_AUTH_COMMAND *sessionDataArray[2];
+    TPMS_AUTH_RESPONSE *sessionDataOutArray[2];
 
     TPM2B_SENSITIVE_DATA outData = TPM2B_TYPE_INIT(TPM2B_SENSITIVE_DATA, buffer);
 
     sessionDataArray[0] = &sessionData;
     sessionDataOutArray[0] = &sessionDataOut;
 
+    sessionDataArray[1] = &sessionData256;
+    sessionDataOutArray[1] = &sessionDataOut256;
+
     sessionsDataOut.rspAuths = &sessionDataOutArray[0];
     sessionsData.cmdAuths = &sessionDataArray[0];
 
-    sessionsDataOut.rspAuthsCount = 1;
-    sessionsData.cmdAuthsCount = 1;
+    sessionsDataOut.rspAuthsCount = 2;
+    sessionsData.cmdAuthsCount = 2;
 
     sessionData.sessionHandle = TPM_RS_PW;
     sessionData.nonce.t.size = 0;
     *((UINT8 *)((void *)&sessionData.sessionAttributes)) = 0;
+    sessionData.sessionHandle = policySession1->sessionHandle;
 
-    sessionData.sessionHandle = policySession->sessionHandle;
+    sessionData256.sessionHandle = TPM_RS_PW;
+    sessionData256.nonce.t.size = 0;
+    *((UINT8 *)((void *)&sessionData256.sessionAttributes)) = 0;
+    sessionData256.sessionHandle = policySession256->sessionHandle;
+
     rval = Tss2_Sys_Unseal(sapi_context, handle2048rsa, &sessionsData, &outData, &sessionsDataOut);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("unseal() failed. ec: 0x%x\n", rval);
-        Tss2_Sys_FlushContext( sapi_context, policySession->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
 
-        if(tpm_session_auth_end(policySession) != TPM_RC_SUCCESS)
+        if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
+        if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
             printf("tpm2_session_auth_end failed\n");
 
         return rval;
@@ -172,14 +204,13 @@ UINT32 unseal(TSS2_SYS_CONTEXT *sapi_context, TPMI_DH_OBJECT itemHandle, int P_f
     //Write data directly to stdout, to be consumed by the caller
     fwrite(outData.t.buffer, 1, outData.t.size, stdout);
 
-	Tss2_Sys_FlushContext( sapi_context, policySession->sessionHandle);
+	Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+	Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
 
-    rval = tpm_session_auth_end(policySession);
-    if(rval != TPM_RC_SUCCESS)
-    {
-        printf("tpm2_session_auth_end failed: ec: 0x%x\n", rval);
-        return -4;
-    }
+	if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+		printf("tpm2_session_auth_end failed\n");
+	if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
+		printf("tpm2_session_auth_end failed\n");
 
     return 0;
 }

@@ -58,29 +58,50 @@ int seal(TSS2_SYS_CONTEXT *sapi_context, TPM2B_SENSITIVE_CREATE *inSensitive, TP
          INT32 pcrCount)
 {
     UINT32 rval;
-    SESSION *policySession;
+    SESSION *policySession1, *policySession256;
     TPM2B_PUBLIC inPublic;
-    TPM2B_DIGEST policyDigest;
+    TPM2B_DIGEST policyDigest1, policyDigest256;
 
     //Build a trial policy gated by the provided PCR
-    rval = build_policy_external(sapi_context, &policySession, true, pcrList, pcrCount, &policyDigest, nameAlg);
+    rval = build_policy_external(sapi_context, &policySession1, true, pcrList, pcrCount, &policyDigest1, TPM_ALG_SHA1);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("build_policy failed, ec: 0x%x\n", rval);
         return rval;
     }
 
-    inPublic.t.publicArea.authPolicy.t.size = policyDigest.t.size;
-    memcpy(inPublic.t.publicArea.authPolicy.t.buffer, policyDigest.t.buffer, policyDigest.t.size);
+    rval = build_policy_external(sapi_context, &policySession256, true, pcrList, pcrCount, &policyDigest256, TPM_ALG_SHA256);
+    if(rval != TPM_RC_SUCCESS)
+    {
+        printf("build_policy failed, ec: 0x%x\n", rval);
+        return rval;
+    }
+    inPublic.t.publicArea.authPolicy.t.size = 0;
+    //inPublic.t.publicArea.authPolicy.t.size = policyDigest.t.size;
+    //memcpy(inPublic.t.publicArea.authPolicy.t.buffer, policyDigest.t.buffer, policyDigest.t.size);
 
     //Seal the provided data
-    rval = create(sapi_context, handle2048rsa, &inPublic, inSensitive, type, nameAlg, outputPublicFilepath, outputPrivateFilepath, o_flag, O_flag, I_flag, b_flag, objectAttributes);
+    rval = create(sapi_context, handle2048rsa, &inPublic, inSensitive, type, nameAlg, outputPublicFilepath, outputPrivateFilepath, o_flag, O_flag, I_flag, b_flag, objectAttributes, policySession1, policySession256);
     if(rval != TPM_RC_SUCCESS)
     {
         printf("create() failed, ec: 0x%x\n", rval);
+        Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+        Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
+
+        if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed\n");
+        if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
+            printf("tpm2_session_auth_end failed\n");
         return rval;
     }
 
+	Tss2_Sys_FlushContext( sapi_context, policySession1->sessionHandle);
+	Tss2_Sys_FlushContext( sapi_context, policySession256->sessionHandle);
+
+	if(tpm_session_auth_end(policySession1) != TPM_RC_SUCCESS)
+		printf("tpm2_session_auth_end failed\n");
+	if(tpm_session_auth_end(policySession256) != TPM_RC_SUCCESS)
+		printf("tpm2_session_auth_end failed\n");
     return rval;
 
 }

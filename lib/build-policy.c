@@ -107,7 +107,7 @@ int build_policy_external(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession,
         return rval;
     }
 
-    if( trial )
+    /*if( trial )
     {
         // Need to flush the session here.
         rval = Tss2_Sys_FlushContext( sysContext, (*policySession)->sessionHandle );
@@ -118,7 +118,7 @@ int build_policy_external(TSS2_SYS_CONTEXT *sysContext, SESSION **policySession,
         rval = tpm_session_auth_end( *policySession );
         if( rval != TPM_RC_SUCCESS )
             return rval;
-    }
+    }*/
 
     memcpy(policyDigestOut->t.buffer, policyDigest.t.buffer, policyDigest.t.size);
     policyDigestOut->t.size = policyDigest.t.size;
